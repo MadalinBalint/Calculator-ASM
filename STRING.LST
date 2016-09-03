@@ -1,0 +1,131 @@
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 1
+string.asm
+
+
+
+      1				     ; Fisier pentru operatii cu string-uri
+      2				     .286
+      3	0000			     .model large
+      4
+      5				     public strlen_proc, strcat_proc, strchr_proc
+      6				     public memset_proc
+      7				     public strcmp_proc
+      8
+      9	0000			     .code
+     10
+     11	0000			     strlen_proc proc far
+     12	0000  33 C9			     xor cx, cx
+     13	0002  F7 D1			     not cx
+     14	0004  33 C0			     xor ax, ax
+     15	0006  FC			     cld
+     16	0007  F2> AE			     repne scasb
+     17	0009  F7 D1			     not cx
+     18	000B  49			     dec cx
+     19
+     20	000C  8B C1			 mov ax, cx
+     21
+     22	000E  CB			     retf
+     23	000F			     strlen_proc endp
+     24
+     25	000F			     strcat_proc proc far
+     26	000F  33 C9			     xor cx, cx
+     27	0011  F7 D1			     not cx
+     28	0013  33 C0			     xor ax, ax
+     29	0015  FC			     cld
+     30	0016  F2> AE			     repne scasb
+     31	0018  4F			     dec di
+     32	0019  AC		     _1: lodsb
+     33	001A  AA			     stosb
+     34	001B  84 C0			     test al, al
+     35	001D  75 FA			     jne _1
+     36
+     37	001F  CB			     retf
+     38	0020			     strcat_proc endp
+     39
+     40	0020			     strchr_proc proc far
+     41	0020  FC			     cld
+     42	0021			     again:
+     43	0021  8A 04			 mov al, [si]
+     44	0023  3C 00			     cmp al, 0
+     45	0025  74 09			     je	final
+     46	0027  3A C4			     cmp al, ah
+     47	0029  74 03			     je	gasit
+     48	002B  46			     inc si
+     49	002C  EB F3			     jmp again
+     50	002E			     gasit:
+     51	002E  B0 01			 mov al, 1
+     52	0030			     final:
+     53	0030  CB			     retf
+     54	0031			     strchr_proc endp
+     55
+     56	0031			     memset_proc proc far
+     57	0031  FC			     cld
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 2
+string.asm
+
+
+
+     58	0032  F3>			     rep
+     59	0033  AA			     stosb
+     60	0034  CB			     retf
+     61	0035			     memset_proc endp
+     62
+     63	0035			     strcmp_proc proc far
+     64	0035			     scloop:
+     65	0035  8A 04			 mov al, [si]
+     66	0037  8A 1D			 mov bl, [di]
+     67	0039  2A C3			 sub al, bl
+     68	003B  75 09			 jne scdone
+     69	003D  80 FB 00			 cmp bl,0
+     70	0040  74 04			 jz  scdone
+     71	0042  46			 inc si
+     72	0043  47			 inc di
+     73	0044  EB EF			 jmp scloop
+     74	0046			     scdone:
+     75	0046  98			 cbw
+     76	0047  CB			     retf
+     77	0048			     strcmp_proc endp
+     78
+     79				     end
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 3
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "04/04/16"
+??FILENAME			  Text	 "string  "
+??TIME				  Text	 "21:24:55"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@CODE				  Text	 STRING_TEXT
+@CODESIZE			  Text	 1
+@CPU				  Text	 0707H
+@CURSEG				  Text	 STRING_TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 1
+@FILENAME			  Text	 STRING
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 5
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+AGAIN				  Near	 STRING_TEXT:0021
+FINAL				  Near	 STRING_TEXT:0030
+GASIT				  Near	 STRING_TEXT:002E
+MEMSET_PROC			  Far	 STRING_TEXT:0031
+SCDONE				  Near	 STRING_TEXT:0046
+SCLOOP				  Near	 STRING_TEXT:0035
+STRCAT_PROC			  Far	 STRING_TEXT:000F
+STRCHR_PROC			  Far	 STRING_TEXT:0020
+STRCMP_PROC			  Far	 STRING_TEXT:0035
+STRLEN_PROC			  Far	 STRING_TEXT:0000
+_1				  Near	 STRING_TEXT:0019
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  0000 Word	  Public  DATA
+STRING_TEXT			  16  0048 Word	  Public  CODE
+

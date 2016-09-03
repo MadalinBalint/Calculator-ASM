@@ -1,0 +1,1209 @@
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 1
+io.asm
+
+
+
+      1					 .286
+      2					 .287
+      3
+      4	    0000			 .model	large
+      5
+      6					 ;
+      7					 ; Declaratii de simboluri publice
+      8					 ;
+      9						 public	itoa_proc,atoi_proc,puts_proc,puti_proc
+     10						 public	gets_proc,getc_proc,putc_proc,putu_proc
+     11						 public	ftoa_proc, ftoa_sc_proc, atof_proc
+     12						 public	ltoa_proc
+     13
+     14					 dosint	 macro	 func
+     15						 mov	 ah,func ;Macro	de apel	functii	DOS
+     16						 int	 21h
+     17					 endm
+     18
+     19					 f_comp	macro val
+     20						 local temp, etgt, etlt, eteq, gata
+     21					 .data
+     22						 temp dd ? ; Spatiu de lucru
+     23					 .code
+     24						 push ax ; Salvare AX
+     25						 fld st	; Se face o copie a varfului
+     26							    ; stivei, pentru. a	nu
+     27						    ; altera ST	initial
+     28						 fsub dword ptr	val ; ST <- ST - val
+     29						 fstp dword ptr	temp ; Depunem diferenta
+     30						 mov al, byte ptr temp+3 ; Luam	ultimul	octet
+     31						 ; din reprezentare
+     32						 and al, 10000000B ; Filtru bit	de semn
+     33						 jnz etlt ; Diferenta negativa ?
+     34						 mov ax, word ptr temp ; Nu, testam daca nu
+     35						 ; este	zero
+     36						 or ax,	word ptr temp+2	; Zero real are	toti cei
+     37						 ; 4 octeti null
+     38						 jz eteq ; Este	zero ?
+     39					 etgt:
+     40						 mov ax, 2 ; Nu, inseamna ca e mai mare
+     41						 cmp ax, 1 ; Facem o comparatie	pentru a
+     42						 jmp gata ; pozitiona indicatorii
+     43					 etlt:
+     44						 mov ax, word ptr temp
+     45						 or ax,	word ptr temp+2
+     46						 and ax, 7FFFH ; -0 si 0 sunt identice
+     47						 jz eteq
+     48						 mov ax, 1 ; Cazul mai mic
+     49						 cmp ax, 2
+     50						 jmp gata
+     51					 eteq:
+     52						 mov ax, 1 ; Cazul egal
+     53						 cmp ax, 1
+     54					 gata:
+     55						 pop ax	; Refacere AX si gata
+     56					 endm
+     57
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 2
+io.asm
+
+
+
+     58	    0000			 .code
+     59					 ;
+     60					 ; Schimba ordinea caracterelor	din sirul indicat de DS:SI
+     61					 ;
+     62	    0000			 strrev	 proc	 far
+     63	    0000  80 3D	00			 cmp	 byte ptr [di],0 ; Test	terminator sir
+     64	    0003  74 1E				 je	 str_5
+     65	    0005  57				 push	 di		 ; Salvari
+     66	    0006  56				 push	 si
+     67	    0007  50				 push	 ax
+     68	    0008  8B F7				 mov	 si,di		 ; Copie adresa	sir
+     69	    000A			 str_1:
+     70	    000A  8A 04				 mov	 al,[si]	 ; Determina sfarsit sir
+     71	    000C  84 C0				 test	 al,al
+     72	    000E  74 03				 jz	 str_2
+     73	    0010  46				 inc	 si		 ; Incrementeaza adresa
+     74	    0011  EB F7				 jmp	 str_1
+     75	    0013			 str_2:
+     76	    0013  4E				 dec	 si		 ; SI pe ultimul caracter util
+     77	    0014			 str_3:
+     78	    0014  8A 04				 mov	 al,[si]	 ; Interschimba
+     79	    0016  86 05				 xchg	 al,[di]	 ; ultimul caracter
+     80	    0018  88 04				 mov	 [si],al	 ; cu primul
+     81	    001A  47				 inc	 di
+     82	    001B  4E				 dec	 si
+     83	    001C  3B FE				 cmp	 di,si		 ; Pana	cand pointerul crescator
+     84	    001E  72 F4				 jb	 str_3		 ; devine mai mare decat cel descrescator
+     85	    0020  58				 pop	 ax		 ; Refaceri
+     86	    0021  5E				 pop	 si
+     87	    0022  5F				 pop	 di
+     88	    0023			 str_5:
+     89	    0023  CB				 retf
+     90	    0024			 strrev	 endp
+     91
+     92					 ;
+     93					 ; Converteste intregul	cu semn	din AX la sirul	de caractere
+     94					 ; de la adresa	DS:DI
+     95	    0024			 itoa_proc	 proc	 far
+     96	    0024  50				 push	 ax		 ; Salvari
+     97	    0025  53				 push	 bx
+     98	    0026  51				 push	 cx
+     99	    0027  52				 push	 dx
+    100	    0028  57				 push	 di
+    101
+    102	    0029  33 F6				 xor si, si
+    103
+    104	    002B  3D 0800			 cmp	 ax, 800h			 ; Caz special
+    105	    002E  75 21				 jne	 itoa_1
+    106	    0030  C6 05	2D			 mov	 byte ptr [di],'-'	 ; care	se
+    107	    0033  C6 45	01 33			 mov	 byte ptr [di+1],'3'	 ; converteste
+    108	    0037  C6 45	02 32			 mov	 byte ptr [di+2],'2'	 ; manual
+    109	    003B  C6 45	03 37			 mov	 byte ptr [di+3],'7'	 ; deoarece NEG	din 800h va da
+    110	    003F  C6 45	04 36			 mov	 byte ptr [di+4],'6'	 ; tot 800h (adica -32768)
+    111	    0043  C6 45	05 38			 mov	 byte ptr [di+5],'8'
+    112	    0047  C6 45	06 00			 mov	 byte ptr [di+6],0
+    113	    004B  BE 0006			 mov si, 6
+    114	    004E  EB 31	90			 jmp	 itoa_2
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 3
+io.asm
+
+
+
+    115	    0051			 itoa_1:
+    116	    0051  B1 20				 mov	 cl,' '			 ; Memoram semnul
+    117	    0053  3D 0000			 cmp	 ax,0
+    118	    0056  7D 04				 jge	 itoa_3
+    119	    0058  B1 2D				 mov	 cl,'-'
+    120	    005A  F7 D8				 neg	 ax			 ; Valoare absoluta
+    121	    005C			 itoa_3:
+    122	    005C  BB 000A			 mov	 bx,10			 ; Impartitor
+    123	    005F			 itoa_4:
+    124	    005F  BA 0000			 mov	 dx,0			 ; Impartire 32	de biti
+    125	    0062  F7 F3				 div	 bx			 ; la 16 biti
+    126	    0064  80 C2	30			 add	 dl,'0'			 ; Cifra curenta
+    127	    0067  88 15				 mov	 [di],dl		 ; depusa in sir
+    128	    0069  47				 inc	 di
+    129	    006A  46				 inc si
+    130	    006B  85 C0				 test	 ax,ax			 ; Pana	cand AX	devine 0
+    131	    006D  75 F0				 jnz	 itoa_4
+    132	    006F  80 F9	2D			 cmp	 cl,'-'			 ; Test	semn
+    133	    0072  75 04				 jne	 itoa_6
+    134	    0074  88 0D				 mov	 [di],cl		 ; Pune	minus
+    135	    0076  47				 inc	 di
+    136	    0077  46				 inc si
+    137	    0078			 itoa_6:
+    138	    0078  C6 05	00			 mov	 byte ptr [di],0	 ; Terminator
+    139	    007B  5F				 pop	 di			 ; Adresa de inceput
+    140	    007C  0E E8	FF80			 call	 far ptr strrev		 ; Inverseaza sir
+    141	    0080  57				 push	 di			 ; Pentru POP-urile care vin
+    142	    0081			 itoa_2:
+    143	    0081  5F				 pop	 di			 ; Refaceri
+    144	    0082  5A				 pop	 dx
+    145	    0083  59				 pop	 cx
+    146	    0084  5B				 pop	 bx
+    147	    0085  58				 pop	 ax
+    148	    0086  CB				 retf
+    149	    0087			 itoa_proc	 endp
+    150
+    151					 ;
+    152					 ; Converteste long cu semn din	EAX la sirul de	caractere
+    153					 ; de la adresa	DS:DI
+    154					 ; in SI cate caractere	a convertit
+    155					 .386
+    156	    0087			 ltoa_proc	 proc	 far
+    157	    0087  50				 push	 ax		 ; Salvari
+    158	    0088  53				 push	 bx
+    159	    0089  51				 push	 cx
+    160	    008A  52				 push	 dx
+    161	    008B  57				 push	 di
+    162
+    163	    008C  33 F6				 xor si, si
+    164					 ;
+    165	    008E  66| 3D 80000000		 cmp	 eax, 80000000h			 ; Caz special
+    166	    0094  75 37	90 90			 jne	 ltoa_1
+    167	    0098  C6 05	2D			 mov	 byte ptr [di],'-'	 ; care	se
+    168	    009B  C6 45	01 32			 mov	 byte ptr [di+1],'2'	 ; converteste
+    169	    009F  C6 45	02 31			 mov	 byte ptr [di+2],'1'	 ; manual
+    170	    00A3  C6 45	03 34			 mov	 byte ptr [di+3],'4'	 ; deoarece NEG	din 800h va da
+    171	    00A7  C6 45	04 37			 mov	 byte ptr [di+4],'7'	 ; tot 800h (adica -32768)
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 4
+io.asm
+
+
+
+    172	    00AB  C6 45	05 34			 mov	 byte ptr [di+5],'4'
+    173	    00AF  C6 45	06 38			 mov	 byte ptr [di+6],'8'
+    174	    00B3  C6 45	07 33			 mov	 byte ptr [di+7],'3'
+    175	    00B7  C6 45	08 36			 mov	 byte ptr [di+8],'6'
+    176	    00BB  C6 45	09 34			 mov	 byte ptr [di+9],'4'
+    177	    00BF  C6 45	0A 38			 mov	 byte ptr [di+10],'8'
+    178	    00C3  C6 45	0B 00			 mov	 byte ptr [di+11],0
+    179	    00C7  BE 000B			 mov si, 11
+    180	    00CA  EB 3F	90			 jmp	 ltoa_2
+    181	    00CD			 ltoa_1:
+    182	    00CD  B1 20				 mov	 cl,' '			 ; Memoram semnul
+    183	    00CF  66| 83 F8 00			 cmp	 eax,0
+    184	    00D3  7D 07	90 90			 jge	 ltoa_3
+    185	    00D7  B1 2D				 mov	 cl,'-'
+    186	    00D9  66| F7 D8			 neg	 eax			 ; Valoare absoluta
+    187	    00DC			 ltoa_3:
+    188	    00DC  66| BB 0000000A		 mov	 ebx,10			 ; Impartitor
+    189	    00E2			 ltoa_4:
+    190	    00E2  66| BA 00000000		 mov	 edx,0			 ; Impartire 32	de biti
+    191	    00E8  66| F7 F3			 div	 ebx			 ; la 16 biti
+    192	    00EB  80 C2	30			 add	 dl,'0'			 ; Cifra curenta
+    193	    00EE  88 15				 mov	 [di],dl		 ; depusa in sir
+    194	    00F0  47				 inc	 di
+    195	    00F1  46				 inc si
+    196	    00F2  66| 85 C0			 test eax,eax			 ; Pana	cand AX	devine 0
+    197	    00F5  75 EB				 jnz	 ltoa_4
+    198	    00F7  80 F9	2D			 cmp	 cl,'-'			 ; Test	semn
+    199	    00FA  75 06	90 90			 jne	 ltoa_6
+    200	    00FE  88 0D				 mov	 [di],cl		 ; Pune	minus
+    201	    0100  47				 inc	 di
+    202	    0101  46				 inc si
+    203	    0102			 ltoa_6:
+    204	    0102  C6 05	00			 mov	 byte ptr [di],0	 ; Terminator
+    205	    0105  5F				 pop	 di			 ; Adresa de inceput
+    206	    0106  0E E8	FEF6			 call	 far ptr strrev		 ; Inverseaza sir
+    207	    010A  57				 push	 di			 ; Pentru POP-urile care vin
+    208	    010B			 ltoa_2:
+    209	    010B  5F				 pop	 di			 ; Refaceri
+    210	    010C  5A				 pop	 dx
+    211	    010D  59				 pop	 cx
+    212	    010E  5B				 pop	 bx
+    213	    010F  58				 pop	 ax
+    214	    0110  CB				 retf
+    215	    0111			 ltoa_proc	 endp
+    216					 .286
+    217
+    218					 ;
+    219					 ; Converteste sirul de	la adresa DI:SI	la intreg in AX
+    220					 ;
+    221	    0111			 atoi_proc	 proc	 far
+    222	    0111  57				 push	 di			 ; Salvari
+    223	    0112  56				 push	 si
+    224	    0113  53				 push	 bx
+    225	    0114  51				 push	 cx
+    226	    0115  52				 push	 dx
+    227	    0116			 atoi_1:
+    228	    0116  80 3C	20			 cmp	 byte ptr [si],' '	 ; Sarim peste spatiile	initiale
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 5
+io.asm
+
+
+
+    229	    0119  75 03				 jne	 atoi_2
+    230	    011B  46				 inc	 si
+    231	    011C  EB F8				 jmp	 atoi_1
+    232	    011E			 atoi_2:
+    233	    011E  BF 0001			 mov	 di,1			 ; Memorare semn '+'
+    234	    0121  80 3C	2B			 cmp	 byte ptr [si],'+'	 ; Test	semn
+    235	    0124  74 08				 je	 atoi_3
+    236	    0126  80 3C	2D			 cmp	 byte ptr [si],'-'
+    237	    0129  75 04				 jne	 atoi_4
+    238	    012B  BF FFFF			 mov	 di,-1			 ; Memorare semn '-'
+    239	    012E			 atoi_3:
+    240	    012E  46				 inc	 si
+    241	    012F			 atoi_4:
+    242	    012F  33 C0				 xor	 ax,ax			 ; Valoare initiala
+    243	    0131  32 ED				 xor	 ch,ch			 ; Pentru adunare cifra
+    244	    0133  BB 000A			 mov	 bx,10			 ; Deinmulit
+    245	    0136			 atoi_5:
+    246	    0136  80 3C	30			 cmp	 byte ptr [si],'0'	 ; Text
+    247	    0139  72 11				 jb	 atoi_6			 ; cifre
+    248	    013B  80 3C	39			 cmp	 byte ptr [si],'9'	 ; zecimale
+    249	    013E  77 0C				 ja	 atoi_6
+    250	    0140  F7 E3				 mul	 bx			 ; n = n * 10
+    251	    0142  8A 0C				 mov	 cl,[si]		 ; +
+    252	    0144  80 E9	30			 sub	 cl,'0'			 ; cifra
+    253	    0147  03 C1				 add	 ax,cx			 ; curenta
+    254	    0149  46				 inc	 si
+    255	    014A  EB EA				 jmp	 atoi_5			 ; Reluare bucla
+    256	    014C			 atoi_6:
+    257	    014C  83 FF	FF			 cmp	 di,-1			 ; A fost '-' ?
+    258	    014F  75 02				 jne	 atoi_7
+    259	    0151  F7 D8				 neg	 ax			 ; Schimba semnul
+    260	    0153			 atoi_7:
+    261	    0153  5A				 pop	 dx			 ; Refaceri
+    262	    0154  59				 pop	 cx
+    263	    0155  5B				 pop	 bx
+    264	    0156  5E				 pop	 si
+    265	    0157  5F				 pop	 di
+    266	    0158  CB				 retf
+    267	    0159			 atoi_proc	 endp
+    268
+    269					 ;
+    270					 ; Afisarea sirului de la adresa DS:SI
+    271					 ;
+    272	    0159			 puts_proc	 proc	 far
+    273	    0159  50				 push	 ax			 ; Salvari
+    274	    015A  56				 push	 si
+    275	    015B  52				 push	 dx
+    276	    015C			 puts_1:
+    277	    015C  8A 14				 mov	 dl,[si]		 ; Preia caracter
+    278	    015E  84 D2				 test	 dl,dl			 ; Test	terminator
+    279	    0160  74 07				 jz	 puts_2
+    280						 dosint	 2			 ; Afisare caracter
+1   281	    0162  B4 02				 mov	 ah,2	 ;Macro	de apel	functii	DOS
+1   282	    0164  CD 21				 int	 21h
+    283	    0166  46				 inc	 si			 ; Urmatorul
+    284	    0167  EB F3				 jmp	 puts_1
+    285	    0169			 puts_2:
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 6
+io.asm
+
+
+
+    286	    0169  5A				 pop	 dx			 ; Refaceri
+    287	    016A  5E				 pop	 si
+    288	    016B  58				 pop	 ax
+    289	    016C  CB				 retf
+    290	    016D			 puts_proc	 endp
+    291
+    292					 ;
+    293					 ; Buffer local	pentru gets_proc
+    294					 ;
+    295	    016D				 .data
+    296	    0000  53*(??)		 buffer	 db	 83 dup(?)
+    297
+    298	    0053				 .code
+    299
+    300					 ;
+    301					 ; Citeste un sir de lungime maxima CX si il depune
+    302					 ; la adresa DS:DI
+    303					 ; Se foloseste	functia	DOS 0AH, care vrea lungimea maxima pe
+    304					 ; primul octet	al bufferului. Ea raporteaza cate caractere
+    305					 ; s-au	citit de fapt in al doilea octet al bufferu-ului.
+    306					 ; Caracterele sunt depuse incepand de la al treilea octet al
+    307					 ; buffer-ului.	Lungimea raportata nu include CR final,
+    308					 ; care	se depune totusi in buffer-ul local. Functia 0AH
+    309					 ; accepta MAX-1 caractere, unde MAX este primul octet din
+    310					 ; buffer, dupa	care se	da un semnal sonor si se asteapta
+    311					 ;obligatoriu CR.
+    312					 ;
+    313	    016D			 gets_proc	 proc	 far
+    314	    016D  50				 push	 ax			 ; Salvari
+    315	    016E  52				 push	 dx
+    316	    016F  57				 push	 di
+    317	    0170  56				 push	 si
+    318	    0171  06				 push	 es
+    319
+    320	    0172  8C D8				 mov	 ax,ds			 ; Vom folosi
+    321										 ; instructiuni
+    322	    0174  8E C0				 mov	 es,ax			 ; cu siruri
+    323	    0176  83 F9	50			 cmp	 cx,80			 ; Trunchiem lungimea
+    324	    0179  7E 03				 jle	 gets_1			 ; maxima la 80	de
+    325	    017B  B9 0050			 mov	 cx,80			 ; caractere
+    326	    017E			 gets_1:
+    327	    017E  83 F9	02			 cmp	 cx,2			 ; Si la
+    328	    0181  7D 03				 jge	 gets_2			 ; minim 2 caractere
+    329	    0183  B9 0002			 mov	 cx,2			 ; (pentru CR si terminator)
+    330	    0186			 gets_2:
+    331	    0186  88 0E	0000r			 mov	 buffer,cl		 ; Pregatire buffer
+    332	    018A  BA 0000r			 lea	 dx,buffer
+    333						 dosint	 0AH			 ; Apel	functie
+1   334	    018D  B4 0A				 mov	 ah,0AH	 ;Macro	de apel	functii	DOS
+1   335	    018F  CD 21				 int	 21h
+    336	    0191  8A 0E	0001r			 mov	 cl,buffer+1		 ; Lungimea efectiva
+    337	    0195  B5 00				 mov	 ch,0			 ; Pentru JCXZ
+    338	    0197  E3 06				 jcxz	 gets_3			 ; Daca	este 0,	este sirul vid
+    339	    0199  BE 0002r			 lea	 si,buffer+2		 ; Caracterele propriu-zise
+    340	    019C  FC				 cld				 ; Directie ascendenta
+    341	    019D  F3> A4			 rep	 movsb	 ; Bucla de copiere in spatiul utilizatorului
+    342	    019F			 gets_3:
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 7
+io.asm
+
+
+
+    343	    019F  26: C6 05 00			 mov	 byte ptr es:[di],0	 ; Terminator sir
+    344	    01A3  B2 0D				 mov	 dl,0DH			 ; Un CR/LF in ecou
+    345						 dosint	 2			 ; la
+1   346	    01A5  B4 02				 mov	 ah,2	 ;Macro	de apel	functii	DOS
+1   347	    01A7  CD 21				 int	 21h
+    348	    01A9  B2 0A				 mov	 dl,0AH			 ; consola
+    349						 dosint	 2
+1   350	    01AB  B4 02				 mov	 ah,2	 ;Macro	de apel	functii	DOS
+1   351	    01AD  CD 21				 int	 21h
+    352	    01AF  07				 pop	 es			 ; Refaceri
+    353	    01B0  5E				 pop	 si
+    354	    01B1  5F				 pop	 di
+    355	    01B2  5A				 pop	 dx
+    356	    01B3  58				 pop	 ax
+    357	    01B4  CB				 retf
+    358	    01B5			 gets_proc	 endp
+    359
+    360					 ;
+    361					 ; Citeste caracter in AL
+    362					 ;
+    363	    01B5			 getc_proc	 proc	 far
+    364						 dosint	 1
+1   365	    01B5  B4 01				 mov	 ah,1	 ;Macro	de apel	functii	DOS
+1   366	    01B7  CD 21				 int	 21h
+    367	    01B9  B4 00				 mov	 ah,0			 ; Intoarce ca intreg
+    368	    01BB  CB				 retf
+    369	    01BC			 getc_proc	 endp
+    370
+    371					 ;
+    372					 ; Afiseaza caracterul din AL
+    373					 ;
+    374	    01BC			 putc_proc	 proc	 far
+    375	    01BC  50				 push	 ax
+    376	    01BD  52				 push	 dx
+    377	    01BE  8A D0				 mov	 dl,al
+    378						 dosint	 2
+1   379	    01C0  B4 02				 mov	 ah,2	 ;Macro	de apel	functii	DOS
+1   380	    01C2  CD 21				 int	 21h
+    381	    01C4  5A				 pop	 dx
+    382	    01C5  58				 pop	 ax
+    383	    01C6  CB				 retf
+    384	    01C7			 putc_proc	 endp
+    385
+    386					 ;
+    387					 ; Afiseaza intreg fara	semn. Parametrul in stiva.
+    388					 ;
+    389	    01C7			 putu_proc	 proc	 far
+    390	    01C7  55				 push	 bp
+    391	    01C8  8B EC				 mov	 bp,sp
+    392	    01CA  52				 push	 dx			 ; Salvari
+    393	    01CB  50				 push	 ax
+    394	    01CC  53				 push	 bx
+    395	    01CD  8B 46	06			 mov	 ax,[bp+6]		 ; Preia intreg	din stiva
+    396	    01D0  3D 000A			 cmp	 ax,10
+    397	    01D3  8A D0				 mov	 dl,al
+    398	    01D5  72 0F				 jb	 putu_1			 ; Este	mai mic	decat 10
+    399	    01D7  BB 000A			 mov	 bx,10			 ; Nu, il impartim
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 8
+io.asm
+
+
+
+    400	    01DA  33 D2				 xor	 dx,dx			 ; 32 de biti la 16
+    401	    01DC  F7 F3				 div	 bx			 ; AX =	cat (n/10)
+    402										 ; DX =	rest (n	MOD 10)
+    403	    01DE  50				 push	 ax			 ; Apel
+    404	    01DF  0E E8	FFE4			 call	 far ptr putu_proc	 ; recursiv pentru
+    405	    01E3  83 C4	02			 add	 sp,2			 ; n/10
+    406	    01E6			 putu_1:
+    407	    01E6  80 C2	30			 add	 dl,'0'			 ; Afisare n MOD 10
+    408						 dosint	 2
+1   409	    01E9  B4 02				 mov	 ah,2	 ;Macro	de apel	functii	DOS
+1   410	    01EB  CD 21				 int	 21h
+    411	    01ED  5B				 pop	 bx			 ; Refaceri
+    412	    01EE  58				 pop	 ax
+    413	    01EF  5A				 pop	 dx
+    414	    01F0  5D				 pop	 bp
+    415	    01F1  CB				 retf
+    416	    01F2			 putu_proc	 endp
+    417
+    418					 ;
+    419					 ; Afisare intreg cu semn. Parametrul in stiva.
+    420					 ;
+    421	    01F2			 puti_proc	 proc	 far
+    422	    01F2  55				 push	 bp
+    423	    01F3  8B EC				 mov	 bp,sp
+    424	    01F5  50				 push	 ax			 ; Salvari
+    425	    01F6  52				 push	 dx
+    426	    01F7  8B 46	06			 mov	 ax,[bp+6]		 ; Preia numar
+    427	    01FA  33 C0				 xor	 ax,ax			 ; Test	semn
+    428	    01FC  75 09				 jnz	 puti_1			 ; Este	pozitiv, salt
+    429	    01FE  B2 2D				 mov	 dl,'-'			 ; Este	negativ, se
+    430										 ; afiseaza un '-'
+    431						 dosint	 2
+1   432	    0200  B4 02				 mov	 ah,2	 ;Macro	de apel	functii	DOS
+1   433	    0202  CD 21				 int	 21h
+    434	    0204  F7 5E	06			 neg	 word ptr [bp+6]	 ; Se schimba semnul numarului
+    435	    0207			 puti_1:
+    436	    0207  FF 76	06			 push	 word ptr [bp+6]		 ; Se afiseaza ca numar
+    437										 ; fara	semn
+    438	    020A  0E E8	FFB9			 call	 far ptr putu_proc
+    439	    020E  83 C4	02			 add	 sp,2			 ; Descarca stiva
+    440	    0211  5A				 pop	 dx			 ; Refaceri
+    441	    0212  58				 pop	 ax
+    442	    0213  5D				 pop	 bp
+    443	    0214  CB				 retf
+    444	    0215			 puti_proc	 endp
+    445
+    446					 itoa	 macro	 dest,source
+    447						 push	 ax
+    448						 push	 di
+    449						 mov	 ax,source		 ; Numar intreg
+    450						 lea	 di,dest		 ; Adresa sir generat
+    451						 call	 itoa_proc
+    452						 pop	 di
+    453						 pop	 ax
+    454					 endm
+    455
+    456	00000215			 sablon_ftoa struc
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 9
+io.asm
+
+
+
+    457	00000000  01*(????)				 dw ?
+    458	00000002  01*(????????)				 dd ?
+    459	00000006  01*(????????)			 val dd	?
+    460	0000000A  01*(????)			 siradr	dw ?
+    461	0000000C			 ends
+    462
+    463	    0215			 .data
+    464	    0053  41200000			 _zece dd 10.0
+    465	    0057  3F800000			 _unu dd 1.0
+    466	    005B  00000000			 _zero dd 0.0
+    467	    005F  350637BD			 _round	dd 0.0000005
+    468	    0063  ????				 _exp dw ?
+    469	    0065  ????				 _cifra	dw ?
+    470	    0067  ????????			 _cifra32 dd ?
+    471	    006B  ????????			 _temp dd ?
+    472	    006F  ????				 _cw dw	?
+    473	    0071  0000				 len dw	0
+    474	    0073			 .code
+    475
+    476	    0215			 ftoa_proc proc	far
+    477	    0215  55				 push bp
+    478	    0216  8B EC				 mov bp, sp
+    479	    0218  50				 push ax ; Salvare
+    480	    0219  53				 push bx ; registre
+    481	    021A  56				 push si
+    482	    021B  51				 push cx
+    483	    021C  9B D9	3E 006Fr		 fstcw _cw ; Salvare Control Word
+    484	    0221  A1 006Fr			 mov ax, _cw
+    485	    0224  25 F3FF			 and ax, NOT 0000110000000000B ; Filtru	bitii 10 si 11
+    486	    0227  0D 0400			 or ax,	0000010000000000B ; Fortare RC = 1
+    487	    022A  A3 006Fr			 mov _cw, ax ; inapoi in memorie
+    488	    022D  D9 2E	006Fr			 fldcw _cw ; inapoi in 80x87
+    489
+    490	    0231  C7 06	0063r 0000		 mov _exp, 0 ; Exponent
+    491	    0237  8B 76	0A			 mov si, [bp].siradr ; Adresa sir
+    492						 ; de caractere
+    493	    023A  D9 46	06			 fld dword ptr [bp].val	; Valoare reala	in ST
+    494
+    495	    023D  DB 16	0067r			 fist _cifra32 ; Generam partea
+    496							 ; intreaga
+    497					 .386
+    498	    0241  56				 push si
+    499	    0242  50				 push ax
+    500	    0243  57				 push di
+    501	    0244  66| A1 0067r			 mov	 eax, _cifra32		 ; Numar intreg
+    502	    0248  8B FE				 mov	 di, si			 ; Adresa sir generat
+    503	    024A  0E E8	FE39			 call ltoa_proc
+    504	    024E  89 36	0071r			 mov len, si
+    505	    0252  5F				 pop	 di
+    506	    0253  58				 pop	 ax
+    507	    0254  5E				 pop si
+    508					 .286
+    509	    0255  03 36	0071r			 add si, len
+    510
+    511	    0259  C6 04	2E			 mov byte ptr [si], '.'	; Apoi punctul zecimal
+    512	    025C  46				 inc si
+    513	    025D  B9 0006			 mov cx, 6 ; Bucla de 7	cifre
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 10
+io.asm
+
+
+
+    514								   ; dupa punct
+    515	    0260			 ftoa_5:
+    516	    0260  DA 26	0067r			 fisub _cifra32	; ST = partea
+    517						 ; fractionara
+    518	    0264  D8 0E	0053r			 fmul _zece ; ST = ST *	10
+    519	    0268  DB 16	0067r			 fist _cifra32 ; Partea	intreaga
+    520	    026C  8A 1E	0067r			 mov bl, byte ptr [_cifra32] ; Determinare cifra
+    521	    0270  80 C3	30			 add bl, '0'
+    522	    0273  88 1C				 mov [si], bl
+    523	    0275  46				 inc si
+    524	    0276  E2 E8				 loop ftoa_5
+    525	    0278  D9 1E	006Br			 fstp _temp ; Descarcam	stiva 8087
+    526
+    527	    027C  59				 pop cx	; Refacere
+    528	    027D  5E				 pop si	; registre
+    529	    027E  5B				 pop bx
+    530	    027F  58				 pop ax
+    531	    0280  5D				 pop bp
+    532	    0281  CB				 retf ;	Revenire
+    533	    0282			 ftoa_proc endp
+    534
+    535	    0282			 ftoa_sc_proc proc far
+    536	    0282  55				 push bp
+    537	    0283  8B EC				 mov bp, sp
+    538	    0285  50				 push ax ; Salvare
+    539	    0286  53				 push bx ; registre
+    540	    0287  56				 push si
+    541	    0288  51				 push cx
+    542	    0289  9B D9	3E 006Fr		 fstcw _cw ; Salvare Control Word
+    543	    028E  A1 006Fr			 mov ax, _cw
+    544	    0291  25 F3FF			 and ax, NOT 0000110000000000B ; Filtru	bitii 10 si 11
+    545	    0294  0D 0400			 or ax,	0000010000000000B ; Fortare RC = 1
+    546	    0297  A3 006Fr			 mov _cw, ax ; inapoi in memorie
+    547	    029A  D9 2E	006Fr			 fldcw _cw ; inapoi in 80x87
+    548
+    549	    029E  C7 06	0063r 0000		 mov _exp, 0 ; Exponent
+    550	    02A4  8B 76	0A			 mov si, [bp].siradr ; Adresa sir
+    551						 ; de caractere
+    552	    02A7  D9 46	06			 fld dword ptr [bp].val	; Valoare reala	in ST
+    553						 f_comp	_zero
+1   554	    02AA			 .data
+1   555	    0073  ????????			 ??0000	dd ? ; Spatiu de lucru
+1   556	    0077			 .code
+1   557	    02AA  50				 push ax ; Salvare AX
+1   558	    02AB  D9 C0				 fld st	; Se face o copie a varfului
+1   559							    ; stivei, pentru. a	nu
+1   560						    ; altera ST	initial
+1   561	    02AD  D8 26	005Br			 fsub dword ptr	_zero ;	ST <- ST - _zero
+1   562	    02B1  D9 1E	0073r			 fstp dword ptr	??0000 ; Depunem diferenta
+1   563	    02B5  A0 0076r			 mov al, byte ptr ??0000+3 ; Luam ultimul octet
+1   564						 ; din reprezentare
+1   565	    02B8  24 80				 and al, 10000000B ; Filtru bit	de semn
+1   566	    02BA  75 12				 jnz ??0002 ; Diferenta	negativa ?
+1   567	    02BC  A1 0073r			 mov ax, word ptr ??0000 ; Nu, testam daca nu
+1   568						 ; este	zero
+1   569	    02BF  0B 06	0075r			 or ax,	word ptr ??0000+2 ; Zero real are toti cei
+1   570						 ; 4 octeti null
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 11
+io.asm
+
+
+
+1   571	    02C3  74 1E				 jz ??0003 ; Este zero ?
+1   572	    02C5			 ??0001:
+1   573	    02C5  B8 0002			 mov ax, 2 ; Nu, inseamna ca e mai mare
+1   574	    02C8  3D 0001			 cmp ax, 1 ; Facem o comparatie	pentru a
+1   575	    02CB  EB 1C	90			 jmp ??0004 ; pozitiona	indicatorii
+1   576	    02CE			 ??0002:
+1   577	    02CE  A1 0073r			 mov ax, word ptr ??0000
+1   578	    02D1  0B 06	0075r			 or ax,	word ptr ??0000+2
+1   579	    02D5  25 7FFF			 and ax, 7FFFH ; -0 si 0 sunt identice
+1   580	    02D8  74 09				 jz ??0003
+1   581	    02DA  B8 0001			 mov ax, 1 ; Cazul mai mic
+1   582	    02DD  3D 0002			 cmp ax, 2
+1   583	    02E0  EB 07	90			 jmp ??0004
+1   584	    02E3			 ??0003:
+1   585	    02E3  B8 0001			 mov ax, 1 ; Cazul egal
+1   586	    02E6  3D 0001			 cmp ax, 1
+1   587	    02E9			 ??0004:
+1   588	    02E9  58				 pop ax	; Refacere AX si ??0004
+    589	    02EA  7F 06				 jg _ftoa_poz ;	Este > 0 ?
+    590	    02EC  C6 04	2D			 mov byte ptr [si], '-'	; Nu, depunem '-'
+    591	    02EF  46				 inc si	; in sir si schimbam
+    592	    02F0  D9 E0				 fchs ;	semnul numarului real
+    593	    02F2			 _ftoa_poz:
+    594						 f_comp	_zero
+1   595	    02F2			 .data
+1   596	    0077  ????????			 ??0005	dd ? ; Spatiu de lucru
+1   597	    007B			 .code
+1   598	    02F2  50				 push ax ; Salvare AX
+1   599	    02F3  D9 C0				 fld st	; Se face o copie a varfului
+1   600							    ; stivei, pentru. a	nu
+1   601						    ; altera ST	initial
+1   602	    02F5  D8 26	005Br			 fsub dword ptr	_zero ;	ST <- ST - _zero
+1   603	    02F9  D9 1E	0077r			 fstp dword ptr	??0005 ; Depunem diferenta
+1   604	    02FD  A0 007Ar			 mov al, byte ptr ??0005+3 ; Luam ultimul octet
+1   605						 ; din reprezentare
+1   606	    0300  24 80				 and al, 10000000B ; Filtru bit	de semn
+1   607	    0302  75 12				 jnz ??0007 ; Diferenta	negativa ?
+1   608	    0304  A1 0077r			 mov ax, word ptr ??0005 ; Nu, testam daca nu
+1   609						 ; este	zero
+1   610	    0307  0B 06	0079r			 or ax,	word ptr ??0005+2 ; Zero real are toti cei
+1   611						 ; 4 octeti null
+1   612	    030B  74 1E				 jz ??0008 ; Este zero ?
+1   613	    030D			 ??0006:
+1   614	    030D  B8 0002			 mov ax, 2 ; Nu, inseamna ca e mai mare
+1   615	    0310  3D 0001			 cmp ax, 1 ; Facem o comparatie	pentru a
+1   616	    0313  EB 1C	90			 jmp ??0009 ; pozitiona	indicatorii
+1   617	    0316			 ??0007:
+1   618	    0316  A1 0077r			 mov ax, word ptr ??0005
+1   619	    0319  0B 06	0079r			 or ax,	word ptr ??0005+2
+1   620	    031D  25 7FFF			 and ax, 7FFFH ; -0 si 0 sunt identice
+1   621	    0320  74 09				 jz ??0008
+1   622	    0322  B8 0001			 mov ax, 1 ; Cazul mai mic
+1   623	    0325  3D 0002			 cmp ax, 2
+1   624	    0328  EB 07	90			 jmp ??0009
+1   625	    032B			 ??0008:
+1   626	    032B  B8 0001			 mov ax, 1 ; Cazul egal
+1   627	    032E  3D 0001			 cmp ax, 1
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 12
+io.asm
+
+
+
+1   628	    0331			 ??0009:
+1   629	    0331  58				 pop ax	; Refacere AX si ??0009
+    630	    0332  75 03				 jne _ftoa_aici	; Este diferit de 0.0 ?
+    631	    0334  E9 00DA			 jmp _ftoa_1
+    632	    0337			 _ftoa_aici: ; Da, il convertim
+    633						 f_comp	_zece
+1   634	    0337			 .data
+1   635	    007B  ????????			 ??000A	dd ? ; Spatiu de lucru
+1   636	    007F			 .code
+1   637	    0337  50				 push ax ; Salvare AX
+1   638	    0338  D9 C0				 fld st	; Se face o copie a varfului
+1   639							    ; stivei, pentru. a	nu
+1   640						    ; altera ST	initial
+1   641	    033A  D8 26	0053r			 fsub dword ptr	_zece ;	ST <- ST - _zece
+1   642	    033E  D9 1E	007Br			 fstp dword ptr	??000A ; Depunem diferenta
+1   643	    0342  A0 007Er			 mov al, byte ptr ??000A+3 ; Luam ultimul octet
+1   644						 ; din reprezentare
+1   645	    0345  24 80				 and al, 10000000B ; Filtru bit	de semn
+1   646	    0347  75 12				 jnz ??000C ; Diferenta	negativa ?
+1   647	    0349  A1 007Br			 mov ax, word ptr ??000A ; Nu, testam daca nu
+1   648						 ; este	zero
+1   649	    034C  0B 06	007Dr			 or ax,	word ptr ??000A+2 ; Zero real are toti cei
+1   650						 ; 4 octeti null
+1   651	    0350  74 1E				 jz ??000D ; Este zero ?
+1   652	    0352			 ??000B:
+1   653	    0352  B8 0002			 mov ax, 2 ; Nu, inseamna ca e mai mare
+1   654	    0355  3D 0001			 cmp ax, 1 ; Facem o comparatie	pentru a
+1   655	    0358  EB 1C	90			 jmp ??000E ; pozitiona	indicatorii
+1   656	    035B			 ??000C:
+1   657	    035B  A1 007Br			 mov ax, word ptr ??000A
+1   658	    035E  0B 06	007Dr			 or ax,	word ptr ??000A+2
+1   659	    0362  25 7FFF			 and ax, 7FFFH ; -0 si 0 sunt identice
+1   660	    0365  74 09				 jz ??000D
+1   661	    0367  B8 0001			 mov ax, 1 ; Cazul mai mic
+1   662	    036A  3D 0002			 cmp ax, 2
+1   663	    036D  EB 07	90			 jmp ??000E
+1   664	    0370			 ??000D:
+1   665	    0370  B8 0001			 mov ax, 1 ; Cazul egal
+1   666	    0373  3D 0001			 cmp ax, 1
+1   667	    0376			 ??000E:
+1   668	    0376  58				 pop ax	; Refacere AX si ??000E
+    669	    0377  7C 4B				 jnge _ftoa_2 ;	Este < 10 ?
+    670	    0379			 _ftoa_3:
+    671	    0379  D8 36	0053r			 fdiv _zece ; Nu, il impartim la 10
+    672	    037D  83 06	0063r 01		 add _exp, 1 ; si tinem	minte
+    673						 ; la exponent
+    674						 f_comp	_zece ;	pana cand ajunge
+1   675	    0382			 .data
+1   676	    007F  ????????			 ??000F	dd ? ; Spatiu de lucru
+1   677	    0083			 .code
+1   678	    0382  50				 push ax ; Salvare AX
+1   679	    0383  D9 C0				 fld st	; Se face o copie a varfului
+1   680							    ; stivei, pentru. a	nu
+1   681						    ; altera ST	initial
+1   682	    0385  D8 26	0053r			 fsub dword ptr	_zece ;	ST <- ST - _zece
+1   683	    0389  D9 1E	007Fr			 fstp dword ptr	??000F ; Depunem diferenta
+1   684	    038D  A0 0082r			 mov al, byte ptr ??000F+3 ; Luam ultimul octet
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 13
+io.asm
+
+
+
+1   685						 ; din reprezentare
+1   686	    0390  24 80				 and al, 10000000B ; Filtru bit	de semn
+1   687	    0392  75 12				 jnz ??0011 ; Diferenta	negativa ?
+1   688	    0394  A1 007Fr			 mov ax, word ptr ??000F ; Nu, testam daca nu
+1   689						 ; este	zero
+1   690	    0397  0B 06	0081r			 or ax,	word ptr ??000F+2 ; Zero real are toti cei
+1   691						 ; 4 octeti null
+1   692	    039B  74 1E				 jz ??0012 ; Este zero ?
+1   693	    039D			 ??0010:
+1   694	    039D  B8 0002			 mov ax, 2 ; Nu, inseamna ca e mai mare
+1   695	    03A0  3D 0001			 cmp ax, 1 ; Facem o comparatie	pentru a
+1   696	    03A3  EB 1C	90			 jmp ??0013 ; pozitiona	indicatorii
+1   697	    03A6			 ??0011:
+1   698	    03A6  A1 007Fr			 mov ax, word ptr ??000F
+1   699	    03A9  0B 06	0081r			 or ax,	word ptr ??000F+2
+1   700	    03AD  25 7FFF			 and ax, 7FFFH ; -0 si 0 sunt identice
+1   701	    03B0  74 09				 jz ??0012
+1   702	    03B2  B8 0001			 mov ax, 1 ; Cazul mai mic
+1   703	    03B5  3D 0002			 cmp ax, 2
+1   704	    03B8  EB 07	90			 jmp ??0013
+1   705	    03BB			 ??0012:
+1   706	    03BB  B8 0001			 mov ax, 1 ; Cazul egal
+1   707	    03BE  3D 0001			 cmp ax, 1
+1   708	    03C1			 ??0013:
+1   709	    03C1  58				 pop ax	; Refacere AX si ??0013
+    710	    03C2  7D B5				 jnl _ftoa_3 ; mai mic strict
+    711						 ; decat 10
+    712	    03C4			 _ftoa_2:
+    713						 f_comp	_unu ; Este mai	mare
+1   714	    03C4			 .data
+1   715	    0083  ????????			 ??0014	dd ? ; Spatiu de lucru
+1   716	    0087			 .code
+1   717	    03C4  50				 push ax ; Salvare AX
+1   718	    03C5  D9 C0				 fld st	; Se face o copie a varfului
+1   719							    ; stivei, pentru. a	nu
+1   720						    ; altera ST	initial
+1   721	    03C7  D8 26	0057r			 fsub dword ptr	_unu ; ST <- ST	- _unu
+1   722	    03CB  D9 1E	0083r			 fstp dword ptr	??0014 ; Depunem diferenta
+1   723	    03CF  A0 0086r			 mov al, byte ptr ??0014+3 ; Luam ultimul octet
+1   724						 ; din reprezentare
+1   725	    03D2  24 80				 and al, 10000000B ; Filtru bit	de semn
+1   726	    03D4  75 12				 jnz ??0016 ; Diferenta	negativa ?
+1   727	    03D6  A1 0083r			 mov ax, word ptr ??0014 ; Nu, testam daca nu
+1   728						 ; este	zero
+1   729	    03D9  0B 06	0085r			 or ax,	word ptr ??0014+2 ; Zero real are toti cei
+1   730						 ; 4 octeti null
+1   731	    03DD  74 1E				 jz ??0017 ; Este zero ?
+1   732	    03DF			 ??0015:
+1   733	    03DF  B8 0002			 mov ax, 2 ; Nu, inseamna ca e mai mare
+1   734	    03E2  3D 0001			 cmp ax, 1 ; Facem o comparatie	pentru a
+1   735	    03E5  EB 1C	90			 jmp ??0018 ; pozitiona	indicatorii
+1   736	    03E8			 ??0016:
+1   737	    03E8  A1 0083r			 mov ax, word ptr ??0014
+1   738	    03EB  0B 06	0085r			 or ax,	word ptr ??0014+2
+1   739	    03EF  25 7FFF			 and ax, 7FFFH ; -0 si 0 sunt identice
+1   740	    03F2  74 09				 jz ??0017
+1   741	    03F4  B8 0001			 mov ax, 1 ; Cazul mai mic
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 14
+io.asm
+
+
+
+1   742	    03F7  3D 0002			 cmp ax, 2
+1   743	    03FA  EB 07	90			 jmp ??0018
+1   744	    03FD			 ??0017:
+1   745	    03FD  B8 0001			 mov ax, 1 ; Cazul egal
+1   746	    0400  3D 0001			 cmp ax, 1
+1   747	    0403			 ??0018:
+1   748	    0403  58				 pop ax	; Refacere AX si ??0018
+    749						 ; sau egal ca 1 ?
+    750	    0404  7D 0B				 jge _ftoa_1 ; Da, salt
+    751	    0406  D8 0E	0053r			 fmul _zece ; Nu, il inmultim cu
+    752						 ; 10 si tinem minte
+    753	    040A  83 2E	0063r 01		 sub _exp, 1 ; la exponent,
+    754						 ; pana	ajunge
+    755	    040F  EB B3				 jmp _ftoa_2 ; mai mare	sau
+    756						 ; egal	ca 1
+    757	    0411			 _ftoa_1:
+    758	    0411  D8 06	005Fr			 fadd _round ; Rotunjim	la
+    759						 ; 7 zecimale
+    760						 f_comp	_zece ;	Poate a	depasit
+1   761	    0415			 .data
+1   762	    0087  ????????			 ??0019	dd ? ; Spatiu de lucru
+1   763	    008B			 .code
+1   764	    0415  50				 push ax ; Salvare AX
+1   765	    0416  D9 C0				 fld st	; Se face o copie a varfului
+1   766							    ; stivei, pentru. a	nu
+1   767						    ; altera ST	initial
+1   768	    0418  D8 26	0053r			 fsub dword ptr	_zece ;	ST <- ST - _zece
+1   769	    041C  D9 1E	0087r			 fstp dword ptr	??0019 ; Depunem diferenta
+1   770	    0420  A0 008Ar			 mov al, byte ptr ??0019+3 ; Luam ultimul octet
+1   771						 ; din reprezentare
+1   772	    0423  24 80				 and al, 10000000B ; Filtru bit	de semn
+1   773	    0425  75 12				 jnz ??001B ; Diferenta	negativa ?
+1   774	    0427  A1 0087r			 mov ax, word ptr ??0019 ; Nu, testam daca nu
+1   775						 ; este	zero
+1   776	    042A  0B 06	0089r			 or ax,	word ptr ??0019+2 ; Zero real are toti cei
+1   777						 ; 4 octeti null
+1   778	    042E  74 1E				 jz ??001C ; Este zero ?
+1   779	    0430			 ??001A:
+1   780	    0430  B8 0002			 mov ax, 2 ; Nu, inseamna ca e mai mare
+1   781	    0433  3D 0001			 cmp ax, 1 ; Facem o comparatie	pentru a
+1   782	    0436  EB 1C	90			 jmp ??001D ; pozitiona	indicatorii
+1   783	    0439			 ??001B:
+1   784	    0439  A1 0087r			 mov ax, word ptr ??0019
+1   785	    043C  0B 06	0089r			 or ax,	word ptr ??0019+2
+1   786	    0440  25 7FFF			 and ax, 7FFFH ; -0 si 0 sunt identice
+1   787	    0443  74 09				 jz ??001C
+1   788	    0445  B8 0001			 mov ax, 1 ; Cazul mai mic
+1   789	    0448  3D 0002			 cmp ax, 2
+1   790	    044B  EB 07	90			 jmp ??001D
+1   791	    044E			 ??001C:
+1   792	    044E  B8 0001			 mov ax, 1 ; Cazul egal
+1   793	    0451  3D 0001			 cmp ax, 1
+1   794	    0454			 ??001D:
+1   795	    0454  58				 pop ax	; Refacere AX si ??001D
+    796						 ; acum	10 ?
+    797	    0455  76 09				 jna _ftoa_4
+    798	    0457  D8 36	0053r			 fdiv _zece ; Daca da, corectam
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 15
+io.asm
+
+
+
+    799	    045B  83 06	0063r 01		 add _exp, 1
+    800	    0460			 _ftoa_4:
+    801	    0460  DF 16	0065r			 fist _cifra ; Generam partea
+    802						 ; intreaga
+    803	    0464  8A 1E	0065r			 mov bl, byte ptr _cifra ; Luam	cifra
+    804						 ; propriu-zisa,
+    805	    0468  80 C3	30			 add bl, '0' ; o convertim la
+    806						 ; caracter ASCII
+    807	    046B  88 1C				 mov [si], bl ;	si o depunem in	sir
+    808	    046D  46				 inc si
+    809	    046E  C6 04	2E			 mov byte ptr [si], '.'	; Apoi punctul zecimal
+    810	    0471  46				 inc si
+    811	    0472  B9 0006			 mov cx, 6 ; Bucla de 7	cifre
+    812						 ; dupa	punct
+    813	    0475			 _ftoa_5:
+    814	    0475  DE 26	0065r			 fisub _cifra ;	ST = partea
+    815						 ; fractionara
+    816	    0479  D8 0E	0053r			 fmul _zece ; ST = ST *	10
+    817	    047D  DF 16	0065r			 fist _cifra ; Partea intreaga
+    818	    0481  8A 1E	0065r			 mov bl, byte ptr _cifra ; Determinare cifra
+    819	    0485  80 C3	30			 add bl, '0'
+    820
+    821	    0488  88 1C				 mov [si], bl
+    822	    048A  46				 inc si
+    823	    048B  E2 E8				 loop _ftoa_5
+    824	    048D  D9 1E	006Br			 fstp _temp ; Descarcam	stiva 8087
+    825	    0491  C6 04	45			 mov byte ptr [si], 'E'	; Notatie stiintifica
+    826	    0494  46				 inc si
+    827	    0495  83 3E	0063r 00		 cmp _exp, 0 ; Test semn exponent
+    828	    049A  7D 0A				 jge _ftoa_6
+    829	    049C  C6 04	2D			 mov byte ptr [si], '-'	; Negativ
+    830	    049F  F7 1E	0063r			 neg _exp ; Schimbam semnul
+    831	    04A3  EB 04	90			 jmp _ftoa_7
+    832	    04A6			 _ftoa_6:
+    833	    04A6  C6 04	2B			 mov byte ptr [si], '+'	; Pozitiv
+    834	    04A9			 _ftoa_7:
+    835	    04A9  46				 inc si
+    836	    04AA  A1 0063r			 mov ax, _exp ;	Exponent
+    837	    04AD  D4 0A				 aam ; AH = _exp / 10;
+    838						 ; AL =	_exp MOD 10
+    839	    04AF  0D 3030			 or ax,	3030H ;	Ambele cifre
+    840						 ; convertite la ASCII
+    841	    04B2  88 24				 mov [si], ah ;	Depunere in sir
+    842	    04B4  46				 inc si
+    843	    04B5  88 04				 mov [si], al
+    844	    04B7  46				 inc si
+    845	    04B8  C6 04	00			 mov byte ptr [si], 0 ;	in fine, terminatorul
+    846						 ; de sir
+    847	    04BB  59				 pop cx	; Refacere
+    848	    04BC  5E				 pop si	; registre
+    849	    04BD  5B				 pop bx
+    850	    04BE  58				 pop ax
+    851	    04BF  5D				 pop bp
+    852	    04C0  CB				 retf ;	Revenire
+    853	    04C1			 ftoa_sc_proc endp
+    854
+    855	000004C1			 sablon_atof struc
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 16
+io.asm
+
+
+
+    856	00000000  01*(????)				     dw	? ; Loc	pentru BP
+    857	00000002  01*(????????)				     dd	? ; Loc	pentru adresa de revenire
+    858	00000006  01*(????)			 adr_num dw ?
+    859	00000008  01*(????)			 adr_sir dw ?
+    860	0000000A			 ends
+    861
+    862	    04C1			 .data
+    863	    008B  ??				 _punct	db ?
+    864	    008C  ??				 _minus	db ?
+    865
+    866	    008D			 .code
+    867	    04C1			 atof_proc proc
+    868	    04C1  55				 push bp
+    869	    04C2  8B EC				 mov bp, sp
+    870	    04C4  53				 push bx ; Salvari
+    871	    04C5  56				 push si ; registre
+    872	    04C6  D9 E8				 fld1 ;	ST <- 1.0
+    873	    04C8  D9 EE				 fldz ;	ST <- 0.0, ST(1) <- 1.0
+    874						 ; Asignam valoare in ST si divizor in ST(1)
+    875	    04CA  C6 06	008Br 00		 mov _punct, 0
+    876	    04CF  C6 06	008Cr 00		 mov _minus, 0
+    877	    04D4  32 FF				 xor bh, bh ; Necesar la depunere intreg
+    878	    04D6  8B 76	08			 mov si, [bp].adr_sir ;	Adresa sir
+    879	    04D9  80 3C	2D			 cmp byte ptr [si], '-'	; Test '-'
+    880	    04DC  75 06				 jne atof_1
+    881	    04DE  C6 06	008Cr 01		 mov _minus, 1
+    882	    04E3  46				 inc si
+    883	    04E4			 atof_1:
+    884	    04E4  8A 1C				 mov bl, [si] ;	Preia caracter
+    885	    04E6  80 FB	2E			 cmp bl, '.' ; Test '.'
+    886	    04E9  75 08				 jne atof_2
+    887	    04EB  C6 06	008Br 01		 mov _punct, 1
+    888	    04F0  EB 29	90			 jmp atof_3 ; Salt la reluare
+    889	    04F3			 atof_2:
+    890	    04F3  80 FB	30			 cmp bl, '0' ; Test
+    891	    04F6  72 26				 jb atof_4 ; cifra
+    892	    04F8  80 FB	39			 cmp bl, '9' ; zecimala
+    893	    04FB  77 21				 ja atof_4
+    894	    04FD  80 EB	30			 sub bl, '0' ; Conversie la intreg
+    895	    0500  89 1E	0065r			 mov _cifra, bx	; Memoram ca intreg
+    896	    0504  D8 0E	0053r			 fmul _zece ; valoare =	10*valoare
+    897	    0508  DE 06	0065r			 fiadd _cifra ;	valoare	= valoare +
+    898						 ; cifra
+    899	    050C  80 3E	008Br 01		 cmp _punct, 1 ; Test punct
+    900	    0511  75 08				 jne atof_3
+    901	    0513  D9 C9				 fxch ;	Schimbam ST cu ST(1)
+    902	    0515  D8 0E	0053r			 fmul _zece ; pentru ca	vrem
+    903						 ; sa inmultim
+    904	    0519  D9 C9				 fxch ;	divizorul cu zece,
+    905						 ; apoi	schimbam la loc
+    906	    051B			 atof_3:
+    907	    051B  46				 inc si	; Reluare
+    908	    051C  EB C6				 jmp atof_1 ; bucla
+    909	    051E			 atof_4:
+    910	    051E  DE F1				 fdivr ; impartire ST la ST(1)
+    911						 ; cu descarcarea stivei
+    912						 ; Rezultat in ST
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 17
+io.asm
+
+
+
+    913	    0520  80 3E	008Cr 01		 cmp _minus, 1 ; Test semn
+    914	    0525  75 44				 jne atof_5
+    915						 f_comp	_zero ;	Daca e 0.0 nu
+1   916	    0527			 .data
+1   917	    008D  ????????			 ??001E	dd ? ; Spatiu de lucru
+1   918	    0091			 .code
+1   919	    0527  50				 push ax ; Salvare AX
+1   920	    0528  D9 C0				 fld st	; Se face o copie a varfului
+1   921							    ; stivei, pentru. a	nu
+1   922						    ; altera ST	initial
+1   923	    052A  D8 26	005Br			 fsub dword ptr	_zero ;	ST <- ST - _zero
+1   924	    052E  D9 1E	008Dr			 fstp dword ptr	??001E ; Depunem diferenta
+1   925	    0532  A0 0090r			 mov al, byte ptr ??001E+3 ; Luam ultimul octet
+1   926						 ; din reprezentare
+1   927	    0535  24 80				 and al, 10000000B ; Filtru bit	de semn
+1   928	    0537  75 12				 jnz ??0020 ; Diferenta	negativa ?
+1   929	    0539  A1 008Dr			 mov ax, word ptr ??001E ; Nu, testam daca nu
+1   930						 ; este	zero
+1   931	    053C  0B 06	008Fr			 or ax,	word ptr ??001E+2 ; Zero real are toti cei
+1   932						 ; 4 octeti null
+1   933	    0540  74 1E				 jz ??0021 ; Este zero ?
+1   934	    0542			 ??001F:
+1   935	    0542  B8 0002			 mov ax, 2 ; Nu, inseamna ca e mai mare
+1   936	    0545  3D 0001			 cmp ax, 1 ; Facem o comparatie	pentru a
+1   937	    0548  EB 1C	90			 jmp ??0022 ; pozitiona	indicatorii
+1   938	    054B			 ??0020:
+1   939	    054B  A1 008Dr			 mov ax, word ptr ??001E
+1   940	    054E  0B 06	008Fr			 or ax,	word ptr ??001E+2
+1   941	    0552  25 7FFF			 and ax, 7FFFH ; -0 si 0 sunt identice
+1   942	    0555  74 09				 jz ??0021
+1   943	    0557  B8 0001			 mov ax, 1 ; Cazul mai mic
+1   944	    055A  3D 0002			 cmp ax, 2
+1   945	    055D  EB 07	90			 jmp ??0022
+1   946	    0560			 ??0021:
+1   947	    0560  B8 0001			 mov ax, 1 ; Cazul egal
+1   948	    0563  3D 0001			 cmp ax, 1
+1   949	    0566			 ??0022:
+1   950	    0566  58				 pop ax	; Refacere AX si ??0022
+    951	    0567  74 02				 je atof_5 ; schimba semnul
+    952	    0569  D9 E0				 fchs ;	Schimbare semn
+    953	    056B			 atof_5:
+    954	    056B  8B 5E	06			 mov bx, [bp].adr_num ;	Adresa numar real
+    955	    056E  D9 1F				 fstp dword ptr	[bx] ; Depunere	ST
+    956						 ; cu descarcarea
+    957	    0570  9B				 fwait ; stivei, apoi FWAIT
+    958	    0571  5E				 pop si	; Refaceri
+    959	    0572  5B			     pop bx ; registre
+    960	    0573  5D				 pop bp
+    961	    0574  CB				 retf ;	Revenire
+    962	    0575			 atof_proc endp
+    963
+    964					 end
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 18
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??0000				  Dword	 DGROUP:0073
+??0001				  Near	 IO_TEXT:02C5
+??0002				  Near	 IO_TEXT:02CE
+??0003				  Near	 IO_TEXT:02E3
+??0004				  Near	 IO_TEXT:02E9
+??0005				  Dword	 DGROUP:0077
+??0006				  Near	 IO_TEXT:030D
+??0007				  Near	 IO_TEXT:0316
+??0008				  Near	 IO_TEXT:032B
+??0009				  Near	 IO_TEXT:0331
+??000A				  Dword	 DGROUP:007B
+??000B				  Near	 IO_TEXT:0352
+??000C				  Near	 IO_TEXT:035B
+??000D				  Near	 IO_TEXT:0370
+??000E				  Near	 IO_TEXT:0376
+??000F				  Dword	 DGROUP:007F
+??0010				  Near	 IO_TEXT:039D
+??0011				  Near	 IO_TEXT:03A6
+??0012				  Near	 IO_TEXT:03BB
+??0013				  Near	 IO_TEXT:03C1
+??0014				  Dword	 DGROUP:0083
+??0015				  Near	 IO_TEXT:03DF
+??0016				  Near	 IO_TEXT:03E8
+??0017				  Near	 IO_TEXT:03FD
+??0018				  Near	 IO_TEXT:0403
+??0019				  Dword	 DGROUP:0087
+??001A				  Near	 IO_TEXT:0430
+??001B				  Near	 IO_TEXT:0439
+??001C				  Near	 IO_TEXT:044E
+??001D				  Near	 IO_TEXT:0454
+??001E				  Dword	 DGROUP:008D
+??001F				  Near	 IO_TEXT:0542
+??0020				  Near	 IO_TEXT:054B
+??0021				  Near	 IO_TEXT:0560
+??0022				  Near	 IO_TEXT:0566
+??DATE				  Text	 "04/04/16"
+??FILENAME			  Text	 "io	  "
+??TIME				  Text	 "21:24:55"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@CODE				  Text	 IO_TEXT
+@CODESIZE			  Text	 1
+@CPU				  Text	 0707H
+@CURSEG				  Text	 IO_TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 1
+@FILENAME			  Text	 IO
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 5
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+ATOF_1				  Near	 IO_TEXT:04E4
+ATOF_2				  Near	 IO_TEXT:04F3
+ATOF_3				  Near	 IO_TEXT:051B
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 19
+Symbol Table
+
+
+
+ATOF_4				  Near	 IO_TEXT:051E
+ATOF_5				  Near	 IO_TEXT:056B
+ATOF_PROC			  Far	 IO_TEXT:04C1
+ATOI_1				  Near	 IO_TEXT:0116
+ATOI_2				  Near	 IO_TEXT:011E
+ATOI_3				  Near	 IO_TEXT:012E
+ATOI_4				  Near	 IO_TEXT:012F
+ATOI_5				  Near	 IO_TEXT:0136
+ATOI_6				  Near	 IO_TEXT:014C
+ATOI_7				  Near	 IO_TEXT:0153
+ATOI_PROC			  Far	 IO_TEXT:0111
+BUFFER				  Byte	 DGROUP:0000
+FTOA_5				  Near	 IO_TEXT:0260
+FTOA_PROC			  Far	 IO_TEXT:0215
+FTOA_SC_PROC			  Far	 IO_TEXT:0282
+GETC_PROC			  Far	 IO_TEXT:01B5
+GETS_1				  Near	 IO_TEXT:017E
+GETS_2				  Near	 IO_TEXT:0186
+GETS_3				  Near	 IO_TEXT:019F
+GETS_PROC			  Far	 IO_TEXT:016D
+ITOA_1				  Near	 IO_TEXT:0051
+ITOA_2				  Near	 IO_TEXT:0081
+ITOA_3				  Near	 IO_TEXT:005C
+ITOA_4				  Near	 IO_TEXT:005F
+ITOA_6				  Near	 IO_TEXT:0078
+ITOA_PROC			  Far	 IO_TEXT:0024
+LEN				  Word	 DGROUP:0071
+LTOA_1				  Near	 IO_TEXT:00CD
+LTOA_2				  Near	 IO_TEXT:010B
+LTOA_3				  Near	 IO_TEXT:00DC
+LTOA_4				  Near	 IO_TEXT:00E2
+LTOA_6				  Near	 IO_TEXT:0102
+LTOA_PROC			  Far	 IO_TEXT:0087
+PUTC_PROC			  Far	 IO_TEXT:01BC
+PUTI_1				  Near	 IO_TEXT:0207
+PUTI_PROC			  Far	 IO_TEXT:01F2
+PUTS_1				  Near	 IO_TEXT:015C
+PUTS_2				  Near	 IO_TEXT:0169
+PUTS_PROC			  Far	 IO_TEXT:0159
+PUTU_1				  Near	 IO_TEXT:01E6
+PUTU_PROC			  Far	 IO_TEXT:01C7
+STRREV				  Far	 IO_TEXT:0000
+STR_1				  Near	 IO_TEXT:000A
+STR_2				  Near	 IO_TEXT:0013
+STR_3				  Near	 IO_TEXT:0014
+STR_5				  Near	 IO_TEXT:0023
+_CIFRA				  Word	 DGROUP:0065
+_CIFRA32			  Dword	 DGROUP:0067
+_CW				  Word	 DGROUP:006F
+_EXP				  Word	 DGROUP:0063
+_FTOA_1				  Near	 IO_TEXT:0411
+_FTOA_2				  Near	 IO_TEXT:03C4
+_FTOA_3				  Near	 IO_TEXT:0379
+_FTOA_4				  Near	 IO_TEXT:0460
+_FTOA_5				  Near	 IO_TEXT:0475
+_FTOA_6				  Near	 IO_TEXT:04A6
+_FTOA_7				  Near	 IO_TEXT:04A9
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 20
+Symbol Table
+
+
+
+_FTOA_AICI			  Near	 IO_TEXT:0337
+_FTOA_POZ			  Near	 IO_TEXT:02F2
+_MINUS				  Byte	 DGROUP:008C
+_PUNCT				  Byte	 DGROUP:008B
+_ROUND				  Dword	 DGROUP:005F
+_TEMP				  Dword	 DGROUP:006B
+_UNU				  Dword	 DGROUP:0057
+_ZECE				  Dword	 DGROUP:0053
+_ZERO				  Dword	 DGROUP:005B
+
+Macro Name
+
+DOSINT
+F_COMP
+ITOA
+
+Structure Name			  Type	Offset
+
+SABLON_ATOF
+ ADR_NUM			  Word	 0006
+ ADR_SIR			  Word	 0008
+SABLON_FTOA
+ VAL				  Dword	 0006
+ SIRADR				  Word	 000A
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  0091 Word	  Public  DATA
+IO_TEXT				  16  0575 Word	  Public  CODE
+

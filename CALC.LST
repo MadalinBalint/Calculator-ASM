@@ -1,0 +1,3942 @@
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 1
+calc.asm
+
+
+
+      1				     ; Calculator asemanator cu	cel din	Windows
+      2
+      3				     .286
+      4				     .287
+      5				     include io.h
+1     6					     .xlist
+1     7				     ;
+1     8				     ;	Declaratii de proceduri	externe	(implementate in IO.ASM)
+1     9				     ;
+1    10				     extrn   itoa_proc:far, atoi_proc:far,puts_proc:far
+1    11				     extrn   gets_proc:far, getc_proc:far,putc_proc:far
+1    12				     extrn   puti_proc:far, putu_proc:far
+1    13				     extrn   ftoa_proc:far, atof_proc:far, ftoa_sc_proc:far
+1    14				     extrn   ltoa_proc:far
+1    15
+1    16	      =000D		     cr	     equ     0dh	     ; Constante
+1    17	      =000A		     lf	     equ     0ah	     ; simbolice
+1    18	      =0009		     tab     equ     09h	     ; uzuale
+1    19				     ;
+1    20				     ;	     init_ds_es: Initializarea registrelor DS si ES
+1    21				     ;
+1    22				     init_ds_es	macro
+1    23					     push ax
+1    24					     mov     ax,dgroup
+1    25					     mov     ds,ax
+1    26					     mov     es,ax
+1    27					     pop     ax
+1    28				     endm
+1    29				     ;
+1    30				     ;	     exit_dos: Iesire in DOS
+1    31				     ;
+1    32				     exit_dos	     macro
+1    33					     mov     ax,4c00h
+1    34					     int     21h
+1    35				     endm
+1    36				     ;
+1    37				     ;	     itoa: Conversia Intreg-ASCII
+1    38				     ;
+1    39				     itoa    macro   dest,source
+1    40					     push    ax
+1    41					     push    di
+1    42					     mov     ax,source		     ; Numar intreg
+1    43					     lea     di,dest		     ; Adresa sir generat
+1    44					     call    itoa_proc
+1    45					     pop     di
+1    46					     pop     ax
+1    47				     endm
+1    48
+1    49				     ;
+1    50				     ;	     atoi: Conversie ASCII-Intreg
+1    51				     ;
+1    52				     atoi    macro   source
+1    53					     push    si
+1    54					     lea     si,source		     ; Adresa sir
+1    55					     call    atoi_proc		     ; Rezultat	in AX
+1    56					     pop     si
+1    57				     endm
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 2
+calc.asm
+
+
+
+1    58				     ;
+1    59				     ;	     inputs: Citire sir	cu numar maxim admis de	caractere
+1    60				     ;
+1    61				     inputs  macro dest,length
+1    62					     push    di
+1    63					     push    cx
+1    64					     lea     di,dest		     ; Adresa sir
+1    65					     mov     cx,length		     ; Lungime maxima
+1    66					     call    gets_proc
+1    67					     pop     cx
+1    68					     pop     di
+1    69				     endm
+1    70				     ;
+1    71				     ;	     getc: Citire caracter
+1    72				     ;
+1    73				     getc    macro
+1    74					     call    getc_proc		     ; Caracter	in AL
+1    75				     endm
+1    76				     ;
+1    77				     ;	     puti: Afisare intreg cu semn
+1    78				     ;
+1    79				     puti    macro   n
+1    80					     push    n			     ; Intreg
+1    81					     call    far ptr puti_proc
+1    82					     add     sp,2
+1    83				     endm
+1    84				     ;
+1    85				     ;	     putu: Afisare intreg fara semn
+1    86				     ;
+1    87				     putu    macro   n
+1    88					     push    n			     ; Intreg
+1    89					     call    far ptr putu_proc
+1    90					     add     sp,2
+1    91				     endm
+1    92				     ;
+1    93				     ;	     geti: Citire intreg
+1    94				     ;
+1    95				     geti    macro
+1    96					     local   buff
+1    97					     .data
+1    98					     buff    db	     8 dup(0)
+1    99					     .code
+1   100					     inputs  buff,7	     ; Cel mult	sapte cifre si semn
+1   101					     atoi    buff	     ; ASCII-Intreg in AX
+1   102				     endm
+1   103				     ;
+1   104				     ;	     getu: Citire intreg fara semn
+1   105				     ;
+1   106				     getu    macro
+1   107					     geti	     ; Este acelasi lucru cu geti
+1   108				     endm
+1   109				     ;
+1   110				     ;	     puts: Afisare sir
+1   111				     ;
+1   112				     puts    macro   x
+1   113					     push    si
+1   114					     lea     si,x	     ; Adresa sir
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 3
+calc.asm
+
+
+
+1   115					     call    puts_proc
+1   116					     pop     si
+1   117				     endm
+1   118				     ;
+1   119				     ;	     putsi: Afisare sir	imediat	(din aceeasi linia)
+1   120				     ;
+1   121				     putsi   macro   x
+1   122					     local   string
+1   123					     .data
+1   124						     string  db	     x,0     ; Sir definit local
+1   125					     .code
+1   126						     puts    string
+1   127				     endm
+1   128				     ;
+1   129				     ;	     gets: Citeste sir de la consola
+1   130				     ;
+1   131				     gets    macro   x
+1   132					     inputs  x,80	     ; Cel mult	80 de caractere
+1   133				     endm
+1   134				     ;
+1   135				     ;	     putc: Afisare un caracter
+1   136				     ;
+1   137				     putc    macro   x
+1   138					     push    ax
+1   139					     mov     al,x
+1   140					     call    far ptr putc_proc
+1   141					     pop     ax
+1   142				     endm
+1   143				     ;
+1   144				     ;	     getvec: Citeste vector de intrerupere
+1   145				     ;
+1   146				     getvec  macro   oldint,n
+1   147					     push    bx
+1   148					     push    ax
+1   149					     push    es
+1   150					     mov     al,n	     ; Nivel
+1   151					     mov     ah,35h	     ; Apel
+1   152					     int     21h	     ; functie DOS
+1   153					     mov     word ptr oldint,bx	     ; Adresa depunere
+1   154					     mov     word ptr oldint+2,es    ; vector citit
+1   155					     pop     es
+1   156					     pop     ax
+1   157					     pop     bx
+1   158				     endm
+1   159				     ;
+1   160				     ;	     setvec: Modifica vector de	intrerupere
+1   161				     ;
+1   162				     setvec  macro   newint,n
+1   163					     push    ax
+1   164					     push    ds
+1   165					     push    dx
+1   166					     mov     al,n	     ; Nivel
+1   167					     lds     dx,newint	     ; Adresa vector nou
+1   168					     mov     ah,25h	     ; Apel
+1   169					     int     21h	     ; functie DOS
+1   170					     pop     dx
+1   171					     pop     ds
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 4
+calc.asm
+
+
+
+1   172					     pop     ax
+1   173				     endm
+1   174				     ;
+1   175				     ;	     o_read: Deschide fisier pentru citire
+1   176				     ;
+1   177				     o_read  macro   fname,hand
+1   178					     mov     ah,3dh
+1   179					     mov     al,0c0h	     ; Mod acces
+1   180					     lea     dx,fname	     ; Nume fisier
+1   181					     int     21h
+1   182					     mov     hand,ax	     ; Depune handler
+1   183				     endm
+1   184				     ;
+1   185				     ;	     o_write: Deschide fisier pentru scriere
+1   186				     ;
+1   187				     o_write macro   fname,hand
+1   188					     mov     ah,3dh
+1   189					     mov     al,0c1h	     ; Mod acces
+1   190					     lea     dx,fname	     ; Nume fisier
+1   191					     int     21h
+1   192					     mov     hand,ax	     ; Depune handler
+1   193				     endm
+1   194				     ;
+1   195				     ;	     o_creat: Creeaza fisier
+1   196				     ;
+1   197				     o_creat macro   fname,hand
+1   198					     mov     ah,3ch
+1   199					     mov     cx,0	     ; Atribute	normale
+1   200					     lea     dx,fname	     ; Nume fisier
+1   201					     int     21h
+1   202					     mov     hand,ax	     ; Depune handler
+1   203				     endm
+1   204				     ;
+1   205				     ;	     f_read: Citeste date din fisier
+1   206				     ;
+1   207				     f_read  macro   hand,buf,nr
+1   208					     mov     bx,hand	     ; Handler
+1   209					     mov     cx,nr	     ; Numar de	octeti
+1   210					     lea     dx,buf	     ; Buffer (destinatie)
+1   211					     mov     ah,3fh
+1   212					     int     21h
+1   213				     endm
+1   214				     ;
+1   215				     ;	     f_write: Scrie date in fisier
+1   216				     ;
+1   217				     f_write macro   hand,buf,nr
+1   218					     mov     bx,hand	     ; Handler
+1   219					     mov     cx,nr	     ; Numar octeti
+1   220					     lea     dx,buf	     ; Buffer (sursa)
+1   221					     mov     ah,40h
+1   222					     int     21h	     ; AX = numar octeti
+1   223								     ; cititi efectiv
+1   224				     endm
+1   225				     ;
+1   226				     ;	     f_close: Inchidere	fisier
+1   227				     ;
+1   228				     f_close macro   hand
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 5
+calc.asm
+
+
+
+1   229					     mov     ah,3eh
+1   230					     mov     bx,hand	     ; Handler
+1   231					     int     21h
+1   232				     endm
+1   233				     ;
+1   234				     ;	     set_dta: Fixeaza adresa zonei DTA
+1   235				     ;
+1   236				     set_dta macro   dta
+1   237					     mov     ah,1ah
+1   238					     lea     dx,dta	     ; Adresa zonei DTA
+1   239								     ; (41 de octeti)
+1   240					     int     21h
+1   241				     endm
+1   242				     ;
+1   243				     ; find_first: Determina primul fisier dintr-un nume generic
+1   244				     ;
+1   245				     find_first	     macro   name
+1   246					     mov     ah,4eh
+1   247					     lea     dx,name	     ; Nume generic
+1   248					     mov     cx,0	     ; Atribute	normale
+1   249					     int     21h
+1   250				     endm
+1   251				     ;
+1   252				     ; find_next: Determina urmatorul fisier dintr-un nume generic
+1   253				     ;
+1   254				     find_next	     macro   dta_area
+1   255					     mov     ah,4fh
+1   256					     lea     dx,dta_area     ; Adresa zonei DTA
+1   257					     int     21h
+1   258				     endm
+1   259
+1   260				     ; Operatii	de conversie
+1   261				     _atof macro a_sir,	a_num
+1   262					     push si
+1   263					     lea si, a_sir
+1   264					     push si
+1   265					     lea si, a_num
+1   266					     push si
+1   267
+1   268					     call far ptr atof_proc
+1   269					     add sp, 4
+1   270					     pop si
+1   271				     endm
+1   272
+1   273				     _ftoa macro val, sir
+1   274					     local x, maxim, minim, status, @@end, @@ftoa1, @@ftoa2
+1   275
+1   276				     .data
+1   277					     maxim  dd 2.147e09
+1   278					     minim  dd 0.000001
+1   279					     status dw 0
+1   280					     x dd ?
+1   281				     .code
+1   282					     ; incarcam	parametrii in stiva
+1   283					     push ax
+1   284					     lea ax, sir
+1   285					     push ax
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 6
+calc.asm
+
+
+
+1   286					     mov ax, word ptr val + 2
+1   287					     push ax
+1   288					     mov ax, word ptr val
+1   289					     push ax
+1   290
+1   291					     fld dword ptr [val]
+1   292					     fabs
+1   293
+1   294					     ; comparam	nr nostru in valoare absoluta cu maximul reprezentabil
+1   295					     fcom maxim
+1   296
+1   297					     fstsw status
+1   298					     fwait
+1   299					     mov     ax, status
+1   300					     sahf
+1   301					     ja	@@ftoa2
+1   302
+1   303					     ; comparam	nr nostru in valoare absoluta cu minimul reprezentabil
+1   304					     fcomp minim
+1   305
+1   306					     fstsw status
+1   307					     fwait
+1   308					     mov     ax, status
+1   309					     sahf
+1   310					     jb	@@ftoa2
+1   311
+1   312				     @@ftoa1:
+1   313					     ; desc
+1   314					     fstp x
+1   315					     ; afisam nr in format normal
+1   316					     call far ptr ftoa_proc
+1   317					     jmp @@end
+1   318				     @@ftoa2:
+1   319					     fstp x
+1   320					     ; afisam nr in format stiintific
+1   321					     call far ptr ftoa_sc_proc
+1   322				     @@end:
+1   323					     add sp, 6
+1   324					     pop ax
+1   325				     endm
+1   326					     .sall
+1   327					     .list
+    328				     include bios.asm
+1   329				     ; Fisier pentru lucrul cu BIOS
+1   330
+1   331				     ; Constante pt culori
+1   332	      =0000		     black	equ 00h
+1   333	      =0001		     blue	equ 01h
+1   334	      =0002		     green	equ 02h
+1   335	      =0003		     cyan	equ 03h
+1   336	      =0004		     red	equ 04h
+1   337	      =0005		     magenta	equ 05h
+1   338	      =0006		     brown	equ 06h
+1   339	      =0007		     white	equ 07h
+1   340	      =0008		     gray	equ 08h
+1   341	      =0009		     br_blue	equ 09h
+1   342	      =000A		     br_green	equ 0ah
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 7
+calc.asm
+
+
+
+1   343	      =000B		     br_cyan	equ 0bh
+1   344	      =000C		     br_red	equ 0ch
+1   345	      =000D		     br_magenta	equ 0dh
+1   346	      =000E		     yellow	equ 0eh
+1   347	      =000F		     br_white	equ 0fh
+1   348
+1   349				     ; Constante pt tastatura folosind functiile DOS
+1   350				     ; Corespund cu valorile din tabelul ASCII
+1   351	      =0030		     kbd_0	   equ 30h
+1   352	      =0031		     kbd_1	   equ 31h
+1   353	      =0032		     kbd_2	   equ 32h
+1   354	      =0033		     kbd_3	   equ 33h
+1   355	      =0034		     kbd_4	   equ 34h
+1   356	      =0035		     kbd_5	   equ 35h
+1   357	      =0036		     kbd_6	   equ 36h
+1   358	      =0037		     kbd_7	   equ 37h
+1   359	      =0038		     kbd_8	   equ 38h
+1   360	      =0039		     kbd_9	   equ 39h
+1   361
+1   362	      =002D		     kbd_minus	   equ 2dh
+1   363	      =002B		     kbd_plus	   equ 2bh
+1   364	      =002A		     kbd_inmultire equ 2ah
+1   365	      =002F		     kbd_impartire equ 2fh
+1   366	      =002E		     kbd_punct	   equ 2eh ; pune semn pt nr reale
+1   367	      =002D		     kbd_egal	   equ 2dh ; efectueaza	operatia
+1   368
+1   369	      =001B		     kbd_esc	   equ 1bh ; iese din program
+1   370	      =0020		     kbd_spacebar  equ 20h ; schimba semnul numarului
+1   371	      =0008		     kbd_backspace equ 08h ; sterge o cifra
+1   372	      =000D		     kbd_enter	   equ 0dh ; efectueaza	operatia
+1   373
+1   374	      =0063		     kbd_c_mic	   equ 63h ; sterge ecranul calculatorului
+1   375	      =0043		     kbd_c_mare	   equ 43h ;
+1   376	      =0072		     kbd_r_mic	   equ 72h ; operatia Radical
+1   377	      =0052		     kbd_r_mare	   equ 52h ;
+1   378	      =0070		     kbd_p_mic	   equ 70h ; numarul Pi
+1   379	      =0050		     kbd_p_mare	   equ 50h ;
+1   380	      =0069		     kbd_i_mic	   equ 69h ; 1/x - Inversul lui	x
+1   381	      =0049		     kbd_i_mare	   equ 49h ;
+1   382	      =0073		     kbd_s_mic	   equ 73h ; x^2 - patratul lui	x (Square)
+1   383	      =0053		     kbd_s_mare	   equ 53h ;
+1   384	      =0062		     kbd_b_mic	   equ 62h ; x^3 - cubul lui x (cuBe)
+1   385	      =0042		     kbd_b_mare	   equ 42h ;
+1   386
+1   387				     bios_write	macro char, bg_color, fg_color,	count
+1   388					 mov ah, 09h
+1   389					     mov al, char
+1   390					     mov bh, 00h
+1   391					     mov bl, bg_color *	16 + fg_color
+1   392					 mov cx, count
+1   393					     int 10h
+1   394				     endm
+1   395
+1   396				     bios_cls macro
+1   397					     mov ax, 0600h
+1   398					     mov bh, 17h
+1   399					     mov dx,0
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 8
+calc.asm
+
+
+
+1   400					     mov cx, 24	* 256 +	79
+1   401					     int 10h
+1   402				     endm
+1   403
+1   404				     textmode80x25 macro
+1   405					     mov ax, 0003h
+1   406					     int 10h
+1   407				     endm
+1   408
+1   409				     bios_data macro
+1   410					     mov ah, 0fh
+1   411					     int 10h
+1   412				     endm
+1   413
+1   414				     start_video macro
+1   415					     push ax
+1   416					     push es
+1   417					     mov ax, 0b800h
+1   418					     mov es, ax
+1   419				     endm
+1   420
+1   421				     end_video macro
+1   422					     pop es
+1   423					     pop ax
+1   424				     endm
+1   425
+1   426				     ; Doar constante
+1   427				     cls macro bg_color, fg_color
+1   428					     xor di, di	     ; clear di, ES:DI points to video memory
+1   429					     mov ax, bg_color *	4096 + fg_color	* 256
+1   430					     mov cx, 4000    ; amount of times to put it there
+1   431					     cld	     ; direction - forwards
+1   432					     rep stosw	     ; output character	at ES:[DI]
+1   433				     endm
+1   434
+1   435				     ; Doar constante
+1   436				     cls_region	macro x1, y1, x2, y2, bg_color,	fg_color, char
+1   437					     local @@again
+1   438					     mov bx, y1
+1   439				     @@again:
+1   440					     mov ax, 80
+1   441					     mul bx
+1   442					     add ax, x1
+1   443					     shl ax, 1
+1   444					     mov di, ax	     ;mov di, (y1 * 80 + x1) * 2; clear	di, ES:DI points to video memory
+1   445					     mov ax, bg_color *	4096 + fg_color	* 256 +	char
+1   446					     mov cx, (x2 - x1 +	1)
+1   447					     cld	     ; direction - forwards
+1   448					     rep stosw	     ; output character	at ES:[DI]
+1   449					     inc bx
+1   450					     cmp bx, y2
+1   451					     jng @@again
+1   452				     endm
+1   453
+1   454				     ; [ES:DI] = [ES:(y	* 80 + x) * 2]
+1   455				     bios_putc macro x,	y, char
+1   456					     mov bx, y
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 9
+calc.asm
+
+
+
+1   457					     mov ax, 80
+1   458					     mul bx
+1   459					     add ax, x
+1   460					     shl ax, 1
+1   461					     mov di, ax
+1   462					     mov al, char
+1   463					     stosb
+1   464				     endm
+1   465
+1   466				     ; [ES:DI] = [ES:(y	* 80 + x) * 2]
+1   467				     bios_putc_color macro x, y, char, bg_color, fg_color
+1   468					     mov bx, y
+1   469					     mov ax, 80
+1   470					     mul bx
+1   471					     add ax, x
+1   472					     shl ax, 1
+1   473					     mov di, ax
+1   474					     mov ax, bg_color *	4096 + fg_color	* 256 +	char
+1   475					     stosw
+1   476				     endm
+1   477
+1   478				     ; o linie orizontala din caracterul 'char'
+1   479				     bios_hputc_color macro x, y, char,	bg_color, fg_color, count
+1   480					     mov bx, y
+1   481					     mov ax, 80
+1   482					     mul bx
+1   483					     add ax, x
+1   484					     shl ax, 1
+1   485					     mov di, ax
+1   486					     mov ax, bg_color *	4096 + fg_color	* 256 +	char
+1   487					     mov cx, count
+1   488					     cld
+1   489					     rep stosw
+1   490				     endm
+1   491
+1   492				     ; o linie verticala din caracterul	'char'
+1   493				     bios_vputc_color macro x, y, char,	bg_color, fg_color, count
+1   494					     local @@again
+1   495					     mov bx, y
+1   496				     @@again:
+1   497					     mov ax, 80
+1   498					     mul bx
+1   499					     add ax, x
+1   500					     shl ax, 1
+1   501					     mov di, ax
+1   502					     mov ax, bg_color *	4096 + fg_color	* 256 +	char
+1   503					     stosw
+1   504					     inc bx
+1   505					     cmp bx, y+count-1
+1   506					     jng @@again
+1   507				     endm
+1   508
+1   509				     ; Scriem un sir la	pozitia	x, y
+1   510				     bios_puts macro x,	y, sir,	bg_color, fg_color, count
+1   511					     local @@again, @@finish
+1   512					 lea si, sir
+1   513					     mov bx, y
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 10
+calc.asm
+
+
+
+1   514					     mov ax, 80
+1   515					     mul bx
+1   516					     add ax, x
+1   517					     shl ax, 1
+1   518					     mov di, ax
+1   519					     mov ah, bg_color *	16 + fg_color
+1   520					     mov cx, count
+1   521					     cld
+1   522				     @@again:
+1   523					     cmp cx, 0
+1   524					     je	@@finish
+1   525					     lodsb
+1   526					     stosw
+1   527					     dec cx
+1   528					     jmp @@again
+1   529				     @@finish:
+1   530				     endm
+1   531
+1   532				     gotoxy macro x, y
+1   533					     mov ah, 02h
+1   534					     mov bh, 0
+1   535					     mov dh, y
+1   536					     mov dl, x
+1   537					 int 10h
+1   538				     endm
+    539				     include string.h
+1   540
+1   541				     extrn strlen_proc:far
+1   542				     extrn strcat_proc:far
+1   543				     extrn strchr_proc:far
+1   544				     extrn memset_proc:far
+1   545				     extrn strcmp_proc:far
+1   546				     extrn atof_proc:far
+1   547
+1   548				     strlen macro s, len
+1   549					 lea di, s
+1   550					     call strlen_proc
+1   551					     mov [len],	ax
+1   552				     endm
+1   553
+1   554				     strcat macro dest,	source
+1   555					 lea di, dest
+1   556					     lea si, source
+1   557					     call far ptr strcat_proc
+1   558				     endm
+1   559
+1   560				     strchr macro s, c,	gasit
+1   561					     lea si, s
+1   562					     mov ah, c
+1   563					     call far ptr strchr_proc
+1   564					     mov [gasit], al
+1   565				     endm
+1   566
+1   567				     memset macro s, c,	count
+1   568					     mov al, c
+1   569					     lea di, s
+1   570					     mov cx, count
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 11
+calc.asm
+
+
+
+1   571					     call far ptr memset_proc
+1   572				     endm
+1   573
+1   574				     ; pos din source
+1   575				     strpcat macro dest, source, pos
+1   576					 lea di, dest
+1   577					     lea si, source
+1   578					     add si, pos
+1   579					     call far ptr strcat_proc
+1   580				     endm
+1   581
+1   582				     ; compara 2 siruri
+1   583				     strcmp macro cs, ct, gasit
+1   584					 lea si, cs
+1   585					     lea di, ct
+1   586					     call far ptr strcmp_proc
+1   587					     mov [gasit], ax
+1   588				     endm
+1   589
+1   590				     ; str delete last character
+1   591				     strdlc macro source
+1   592					     local @@sfarsit
+1   593
+1   594					     lea di, source
+1   595					     call far ptr strlen_proc
+1   596					     ; Daca sirul are lungimea 0, terminam operatia
+1   597					     cmp ax, 0
+1   598					     je	@@sfarsit
+1   599
+1   600					     ; Punem la	sfarsitul sirului 0
+1   601					     lea si, source
+1   602					     add si, ax
+1   603					     dec si
+1   604					     mov byte ptr [si],	0
+1   605				     @@sfarsit:
+1   606				     endm
+1   607
+1   608				     ; str delete zero
+1   609				     strdz macro source
+1   610					     local @@sfarsit, @@again, @@go_on,	stiintific
+1   611				     .data
+1   612					     stiintific	db 0
+1   613				     .code
+1   614					     strchr source, 'E', stiintific
+1   615					     cmp byte ptr [stiintific],	1
+1   616					     je	@@sfarsit
+1   617
+1   618					     lea di, source
+1   619					     call far ptr strlen_proc
+1   620					     ; Daca sirul are lungimea 0, terminam operatia
+1   621					     cmp ax, 0
+1   622					     je	@@sfarsit
+1   623
+1   624					     ; Punem la	sfarsitul sirului 0
+1   625					     lea si, source
+1   626					     add si, ax
+1   627					     dec si
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 12
+calc.asm
+
+
+
+1   628				     @@again:
+1   629					     cmp byte ptr [si],	'.'
+1   630					     jne @@go_on
+1   631					     mov byte ptr [si],	0
+1   632					     jmp @@sfarsit
+1   633				     @@go_on:
+1   634					     cmp byte ptr [si],	'0'
+1   635					     jne @@sfarsit
+1   636					     cmp ax, 1
+1   637					     je	@@sfarsit
+1   638					     mov byte ptr [si],	0
+1   639					     dec si
+1   640					     dec ax
+1   641					     jmp @@again
+1   642				     @@sfarsit:
+1   643				     endm
+    644
+    645				     ; lungime maxima sir
+    646	      =0015		     max equ 21
+    647
+    648	0000			     .model large
+    649	0000			     .stack 256
+    650	0000			     .data
+    651	0000  0D 0A 00			     newline db	cr, lf,	0
+    652	0003  30 31 32 33 34 35	36	     case db kbd_0, kbd_1, kbd_2, kbd_3, kbd_4,	kbd_5, kbd_6
+    653	000A  37 38 39 2D 2B 2A			  db kbd_7, kbd_8, kbd_9, kbd_minus, kbd_plus, kbd_inmultire
+    654	0010  2F 2E 2D 0D			      db kbd_impartire,	kbd_punct, kbd_egal, kbd_enter
+    655	0014  20 08 63 43		      db kbd_spacebar, kbd_backspace, kbd_c_mic, kbd_c_mare
+    656	0018  72 52 70 50			      db kbd_r_mic, kbd_r_mare,	kbd_p_mic, kbd_p_mare
+    657	001C  69 49 73 53			      db kbd_i_mic, kbd_i_mare,	kbd_s_mic, kbd_s_mare
+    658	0020  62 42				      db kbd_b_mic, kbd_b_mare
+    659	0022  001F			     cases dw $	- case
+    660	0024  070Dr 075Cr 07ABr	  +	     casejmp dw	et_0, et_1, et_2, et_3,	et_4, et_5, et_6
+    661	      07FAr 0849r 0898r	  +
+    662	      08E7r
+    663	0032  0936r 0985r 09D4r	  +		     dw	et_7, et_8, et_9, et_minus, et_plus, et_inmultire
+    664	      0B7Fr 0B35r 0BC9r
+    665	003E  0C13r 0A23r 0FE2r	  +			     dw	et_impartire, et_punct,	et_egal, et_enter
+    666	      0FE2r
+    667	0046  0A92r 1001r			 dw et_spacebar, et_backspace
+    668	004A  1071r 1071r 0C5Dr	  +		     dw	et_c_mic, et_c_mare, et_r_mic, et_r_mare
+    669	      0C5Dr
+    670	0052  0D04r 0D04r 0DA9r	  +			     dw	et_p_mic, et_p_mare, et_i_mic, et_i_mare
+    671	      0DA9r
+    672	005A  0E66r 0E66r 0F21r	  +			     dw	et_s_mic, et_s_mare, et_b_mic, et_b_mare
+    673	      0F21r
+    674
+    675					 ; maxim 16 cifre cu tot cu '.', fara '-'
+    676	0062  16*(00)			     rezultat db (max+1) dup(0)
+    677	0078  16*(00)			     temp db (max+1) dup(0)
+    678	008E  ????			     x dw ?
+    679
+    680	0090  0000			     len dw 0
+    681	0092  2D 30 00			     minus_zero	db "-0", 0
+    682	0095  30 2E 00			     zero_punct	db "0.", 0
+    683	0098  30 00			     zero  db '0', 0
+    684	009A  31 00			     unu   db '1', 0
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 13
+calc.asm
+
+
+
+    685	009C  32 00			     doi   db '2', 0
+    686	009E  33 00			     trei  db '3', 0
+    687	00A0  34 00			     patru db '4', 0
+    688	00A2  35 00			     cinci db '5', 0
+    689	00A4  36 00			     sase  db '6', 0
+    690	00A6  37 00			     sapte db '7', 0
+    691	00A8  38 00			     opt   db '8', 0
+    692	00AA  39 00			     noua  db '9', 0
+    693	00AC  2E 00			     punct db '.', 0
+    694	00AE  2D 00			     minus db '-', 0
+    695	00B0  00			     are_punct db 0 ; variabila	bool daca avem . in rezultat
+    696	00B1  00			     are_minus db 0 ; variabila	bool daca avem - in rezultat
+    697	00B2  0000			     zero_initial dw 0
+    698	00B4  0000			     e_minus_zero dw 0
+    699	00B6  ????????			     numar dd ?	; variabila float pe 32	biti
+    700	00BA  49 6E 74 72 6F 64	75+	     eroare_sqrt db "Introdu un	nr + !", 0
+    701	      20 75 6E 20 6E 72	20+
+    702	      2B 20 21 00
+    703	00CC  49 6D 70 61 72 74	69+	     eroare_div0 db "Impartire la 0 !",	0
+    704	      72 65 20 6C 61 20	30+
+    705	      20 21 00
+    706	00DD  4E 41 4E 2D 6E 6F	74+	     eroare_nan	 db "NAN-not a number",	0
+    707	      20 61 20 6E 75 6D	62+
+    708	      65 72 00
+    709	00EE  2B 49 6E 66 69 6E	69+	     eroare_pinf db "+Infinit",	0
+    710	      74 00
+    711	00F7  2D 49 6E 66 69 6E	69+	     eroare_minf db "-Infinit",	0
+    712	      74 00
+    713	0100  53 54 28 30 29 20	67+	     eroare_gol	 db "ST(0) gol", 0
+    714	      6F 6C 00
+    715	010A  44 65 6E 6F 72 6D	61+	     eroare_dp	 db "Denormalizat +", 0
+    716	      6C 69 7A 61 74 20	2B+
+    717	      00
+    718	0119  44 65 6E 6F 72 6D	61+	     eroare_dn	 db "Denormalizat -", 0
+    719	      6C 69 7A 61 74 20	2D+
+    720	      00
+    721
+    722	0128  ????????			     nr1 dd ?
+    723	012C  ????????			     nr2 dd ?
+    724	0130  00			     op	 db 0
+    725	0131  350637BD			     round dd 0.0000005	; Pt rotunjire
+    726	0135  00			     clear db 0
+    727
+    728	0136  358637BD			     minim  dd 0.000001
+    729	013A  0000			     status dw 0
+    730	013C			     .code
+    731	0000			     start:
+    732					 ; Initializam segmentele pt date si pt	acces memorie text
+    733					     init_ds_es
+1   734	0000  50			     push ax
+1   735	0001  B8 0000s			     mov     ax,dgroup
+1   736	0004  8E D8			     mov     ds,ax
+1   737	0006  8E C0			     mov     es,ax
+1   738	0008  58			     pop     ax
+    739	0009  9B DB E3			     finit
+    740
+    741					     ; Intram in modul text 80x25
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 14
+calc.asm
+
+
+
+    742					     textmode80x25
+1   743	000C  B8 0003			     mov ax, 0003h
+1   744	000F  CD 10			     int 10h
+    745
+    746					     start_video
+1   747	0011  50			     push ax
+1   748	0012  06			     push es
+1   749	0013  B8 B800			     mov ax, 0b800h
+1   750	0016  8E C0			     mov es, ax
+    751
+    752					     ; Stergem tot ecranul
+    753					     cls br_red, white
+1   754	0018  33 FF			     xor di, di	     ; clear di, ES:DI points to video memory
+1   755	001A  B8 C700			     mov ax, br_red * 4096 + white * 256
+1   756	001D  B9 0FA0			     mov cx, 4000    ; amount of times to put it there
+1   757	0020  FC			     cld	     ; direction - forwards
+1   758	0021  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+    759
+    760					     ; Fundalul	calculatorului
+    761					     cls_region	28, 1, 54, 23, br_white, black,	176
+1   762	0023  BB 0001			     mov bx, 1
+1   763	0026			     ??0000:
+1   764	0026  B8 0050			     mov ax, 80
+1   765	0029  F7 E3			     mul bx
+1   766	002B  05 001C			     add ax, 28
+1   767	002E  D1 E0			     shl ax, 1
+1   768	0030  8B F8			     mov di, ax	     ;mov di, (1 * 80 +	28) * 2; clear di, ES:DI points	to video memory
+1   769	0032  B8 F0B0			     mov ax, br_white *	4096 + black * 256 + 176
+1   770	0035  B9 001B			     mov cx, (54 - 28 +	1)
+1   771	0038  FC			     cld	     ; direction - forwards
+1   772	0039  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   773	003B  43			     inc bx
+1   774	003C  83 FB 17			     cmp bx, 23
+1   775	003F  7E E5			     jng ??0000
+    776
+    777					     ; Fundalul	unde se	afiseaza rezultatul calculelor
+    778					     cls_region	30, 3, 52, 5, white, black, 0
+1   779	0041  BB 0003			     mov bx, 3
+1   780	0044			     ??0001:
+1   781	0044  B8 0050			     mov ax, 80
+1   782	0047  F7 E3			     mul bx
+1   783	0049  05 001E			     add ax, 30
+1   784	004C  D1 E0			     shl ax, 1
+1   785	004E  8B F8			     mov di, ax	     ;mov di, (3 * 80 +	30) * 2; clear di, ES:DI points	to video memory
+1   786	0050  B8 7000			     mov ax, white * 4096 + black * 256	+ 0
+1   787	0053  B9 0017			     mov cx, (52 - 30 +	1)
+1   788	0056  FC			     cld	     ; direction - forwards
+1   789	0057  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   790	0059  43			     inc bx
+1   791	005A  83 FB 05			     cmp bx, 5
+1   792	005D  7E E5			     jng ??0001
+    793
+    794					     ; < Randul	1 de operatori >
+    795					     ; Cifra 7
+    796					     cls_region	30, 7, 32, 9, br_cyan, black, 0
+1   797	005F  BB 0007			     mov bx, 7
+1   798	0062			     ??0002:
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 15
+calc.asm
+
+
+
+1   799	0062  B8 0050			     mov ax, 80
+1   800	0065  F7 E3			     mul bx
+1   801	0067  05 001E			     add ax, 30
+1   802	006A  D1 E0			     shl ax, 1
+1   803	006C  8B F8			     mov di, ax	     ;mov di, (7 * 80 +	30) * 2; clear di, ES:DI points	to video memory
+1   804	006E  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1   805	0071  B9 0003			     mov cx, (32 - 30 +	1)
+1   806	0074  FC			     cld	     ; direction - forwards
+1   807	0075  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   808	0077  43			     inc bx
+1   809	0078  83 FB 09			     cmp bx, 9
+1   810	007B  7E E5			     jng ??0002
+    811
+    812					     ; Cifra 8
+    813					     cls_region	34, 7, 36, 9, br_cyan, black, 0
+1   814	007D  BB 0007			     mov bx, 7
+1   815	0080			     ??0003:
+1   816	0080  B8 0050			     mov ax, 80
+1   817	0083  F7 E3			     mul bx
+1   818	0085  05 0022			     add ax, 34
+1   819	0088  D1 E0			     shl ax, 1
+1   820	008A  8B F8			     mov di, ax	     ;mov di, (7 * 80 +	34) * 2; clear di, ES:DI points	to video memory
+1   821	008C  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1   822	008F  B9 0003			     mov cx, (36 - 34 +	1)
+1   823	0092  FC			     cld	     ; direction - forwards
+1   824	0093  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   825	0095  43			     inc bx
+1   826	0096  83 FB 09			     cmp bx, 9
+1   827	0099  7E E5			     jng ??0003
+    828
+    829					     ; Cifra 9
+    830					     cls_region	38, 7, 40, 9, br_cyan, black, 0
+1   831	009B  BB 0007			     mov bx, 7
+1   832	009E			     ??0004:
+1   833	009E  B8 0050			     mov ax, 80
+1   834	00A1  F7 E3			     mul bx
+1   835	00A3  05 0026			     add ax, 38
+1   836	00A6  D1 E0			     shl ax, 1
+1   837	00A8  8B F8			     mov di, ax	     ;mov di, (7 * 80 +	38) * 2; clear di, ES:DI points	to video memory
+1   838	00AA  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1   839	00AD  B9 0003			     mov cx, (40 - 38 +	1)
+1   840	00B0  FC			     cld	     ; direction - forwards
+1   841	00B1  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   842	00B3  43			     inc bx
+1   843	00B4  83 FB 09			     cmp bx, 9
+1   844	00B7  7E E5			     jng ??0004
+    845
+    846					     ; Impartire
+    847					     cls_region	42, 7, 44, 9, br_cyan, black, 0
+1   848	00B9  BB 0007			     mov bx, 7
+1   849	00BC			     ??0005:
+1   850	00BC  B8 0050			     mov ax, 80
+1   851	00BF  F7 E3			     mul bx
+1   852	00C1  05 002A			     add ax, 42
+1   853	00C4  D1 E0			     shl ax, 1
+1   854	00C6  8B F8			     mov di, ax	     ;mov di, (7 * 80 +	42) * 2; clear di, ES:DI points	to video memory
+1   855	00C8  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 16
+calc.asm
+
+
+
+1   856	00CB  B9 0003			     mov cx, (44 - 42 +	1)
+1   857	00CE  FC			     cld	     ; direction - forwards
+1   858	00CF  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   859	00D1  43			     inc bx
+1   860	00D2  83 FB 09			     cmp bx, 9
+1   861	00D5  7E E5			     jng ??0005
+    862
+    863					     ; Numarul pi
+    864					     cls_region	46, 7, 48, 9, br_cyan, black, 0
+1   865	00D7  BB 0007			     mov bx, 7
+1   866	00DA			     ??0006:
+1   867	00DA  B8 0050			     mov ax, 80
+1   868	00DD  F7 E3			     mul bx
+1   869	00DF  05 002E			     add ax, 46
+1   870	00E2  D1 E0			     shl ax, 1
+1   871	00E4  8B F8			     mov di, ax	     ;mov di, (7 * 80 +	46) * 2; clear di, ES:DI points	to video memory
+1   872	00E6  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1   873	00E9  B9 0003			     mov cx, (48 - 46 +	1)
+1   874	00EC  FC			     cld	     ; direction - forwards
+1   875	00ED  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   876	00EF  43			     inc bx
+1   877	00F0  83 FB 09			     cmp bx, 9
+1   878	00F3  7E E5			     jng ??0006
+    879
+    880					     ; Clear
+    881					     cls_region	50, 7, 52, 9, yellow, black, 0
+1   882	00F5  BB 0007			     mov bx, 7
+1   883	00F8			     ??0007:
+1   884	00F8  B8 0050			     mov ax, 80
+1   885	00FB  F7 E3			     mul bx
+1   886	00FD  05 0032			     add ax, 50
+1   887	0100  D1 E0			     shl ax, 1
+1   888	0102  8B F8			     mov di, ax	     ;mov di, (7 * 80 +	50) * 2; clear di, ES:DI points	to video memory
+1   889	0104  B8 E000			     mov ax, yellow * 4096 + black * 256 + 0
+1   890	0107  B9 0003			     mov cx, (52 - 50 +	1)
+1   891	010A  FC			     cld	     ; direction - forwards
+1   892	010B  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   893	010D  43			     inc bx
+1   894	010E  83 FB 09			     cmp bx, 9
+1   895	0111  7E E5			     jng ??0007
+    896
+    897					     ; < Randul	2 de operatori >
+    898					     ; Cifra 4
+    899					     cls_region	30, 11,	32, 13,	br_cyan, black,	0
+1   900	0113  BB 000B			     mov bx, 11
+1   901	0116			     ??0008:
+1   902	0116  B8 0050			     mov ax, 80
+1   903	0119  F7 E3			     mul bx
+1   904	011B  05 001E			     add ax, 30
+1   905	011E  D1 E0			     shl ax, 1
+1   906	0120  8B F8			     mov di, ax	     ;mov di, (11 * 80 + 30) * 2; clear	di, ES:DI points to video memory
+1   907	0122  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1   908	0125  B9 0003			     mov cx, (32 - 30 +	1)
+1   909	0128  FC			     cld	     ; direction - forwards
+1   910	0129  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   911	012B  43			     inc bx
+1   912	012C  83 FB 0D			     cmp bx, 13
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 17
+calc.asm
+
+
+
+1   913	012F  7E E5			     jng ??0008
+    914
+    915					     ; Cifra 5
+    916					     cls_region	34, 11,	36, 13,	br_cyan, black,	0
+1   917	0131  BB 000B			     mov bx, 11
+1   918	0134			     ??0009:
+1   919	0134  B8 0050			     mov ax, 80
+1   920	0137  F7 E3			     mul bx
+1   921	0139  05 0022			     add ax, 34
+1   922	013C  D1 E0			     shl ax, 1
+1   923	013E  8B F8			     mov di, ax	     ;mov di, (11 * 80 + 34) * 2; clear	di, ES:DI points to video memory
+1   924	0140  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1   925	0143  B9 0003			     mov cx, (36 - 34 +	1)
+1   926	0146  FC			     cld	     ; direction - forwards
+1   927	0147  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   928	0149  43			     inc bx
+1   929	014A  83 FB 0D			     cmp bx, 13
+1   930	014D  7E E5			     jng ??0009
+    931
+    932					     ; Cifra 6
+    933					     cls_region	38, 11,	40, 13,	br_cyan, black,	0
+1   934	014F  BB 000B			     mov bx, 11
+1   935	0152			     ??000A:
+1   936	0152  B8 0050			     mov ax, 80
+1   937	0155  F7 E3			     mul bx
+1   938	0157  05 0026			     add ax, 38
+1   939	015A  D1 E0			     shl ax, 1
+1   940	015C  8B F8			     mov di, ax	     ;mov di, (11 * 80 + 38) * 2; clear	di, ES:DI points to video memory
+1   941	015E  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1   942	0161  B9 0003			     mov cx, (40 - 38 +	1)
+1   943	0164  FC			     cld	     ; direction - forwards
+1   944	0165  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   945	0167  43			     inc bx
+1   946	0168  83 FB 0D			     cmp bx, 13
+1   947	016B  7E E5			     jng ??000A
+    948
+    949					     ; Inmultire
+    950					     cls_region	42, 11,	44, 13,	br_cyan, black,	0
+1   951	016D  BB 000B			     mov bx, 11
+1   952	0170			     ??000B:
+1   953	0170  B8 0050			     mov ax, 80
+1   954	0173  F7 E3			     mul bx
+1   955	0175  05 002A			     add ax, 42
+1   956	0178  D1 E0			     shl ax, 1
+1   957	017A  8B F8			     mov di, ax	     ;mov di, (11 * 80 + 42) * 2; clear	di, ES:DI points to video memory
+1   958	017C  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1   959	017F  B9 0003			     mov cx, (44 - 42 +	1)
+1   960	0182  FC			     cld	     ; direction - forwards
+1   961	0183  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   962	0185  43			     inc bx
+1   963	0186  83 FB 0D			     cmp bx, 13
+1   964	0189  7E E5			     jng ??000B
+    965
+    966					     ; 1/x - inversul lui x
+    967					     cls_region	46, 11,	48, 13,	br_cyan, black,	0
+1   968	018B  BB 000B			     mov bx, 11
+1   969	018E			     ??000C:
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 18
+calc.asm
+
+
+
+1   970	018E  B8 0050			     mov ax, 80
+1   971	0191  F7 E3			     mul bx
+1   972	0193  05 002E			     add ax, 46
+1   973	0196  D1 E0			     shl ax, 1
+1   974	0198  8B F8			     mov di, ax	     ;mov di, (11 * 80 + 46) * 2; clear	di, ES:DI points to video memory
+1   975	019A  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1   976	019D  B9 0003			     mov cx, (48 - 46 +	1)
+1   977	01A0  FC			     cld	     ; direction - forwards
+1   978	01A1  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   979	01A3  43			     inc bx
+1   980	01A4  83 FB 0D			     cmp bx, 13
+1   981	01A7  7E E5			     jng ??000C
+    982
+    983					     ; Stergere	cifra
+    984					     cls_region	50, 11,	52, 13,	yellow,	black, 0
+1   985	01A9  BB 000B			     mov bx, 11
+1   986	01AC			     ??000D:
+1   987	01AC  B8 0050			     mov ax, 80
+1   988	01AF  F7 E3			     mul bx
+1   989	01B1  05 0032			     add ax, 50
+1   990	01B4  D1 E0			     shl ax, 1
+1   991	01B6  8B F8			     mov di, ax	     ;mov di, (11 * 80 + 50) * 2; clear	di, ES:DI points to video memory
+1   992	01B8  B8 E000			     mov ax, yellow * 4096 + black * 256 + 0
+1   993	01BB  B9 0003			     mov cx, (52 - 50 +	1)
+1   994	01BE  FC			     cld	     ; direction - forwards
+1   995	01BF  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1   996	01C1  43			     inc bx
+1   997	01C2  83 FB 0D			     cmp bx, 13
+1   998	01C5  7E E5			     jng ??000D
+    999
+   1000					     ; < Randul	3 de operatori >
+   1001					     ; Cifra 1
+   1002					     cls_region	30, 15,	32, 17,	br_cyan, black,	0
+1  1003	01C7  BB 000F			     mov bx, 15
+1  1004	01CA			     ??000E:
+1  1005	01CA  B8 0050			     mov ax, 80
+1  1006	01CD  F7 E3			     mul bx
+1  1007	01CF  05 001E			     add ax, 30
+1  1008	01D2  D1 E0			     shl ax, 1
+1  1009	01D4  8B F8			     mov di, ax	     ;mov di, (15 * 80 + 30) * 2; clear	di, ES:DI points to video memory
+1  1010	01D6  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1  1011	01D9  B9 0003			     mov cx, (32 - 30 +	1)
+1  1012	01DC  FC			     cld	     ; direction - forwards
+1  1013	01DD  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1  1014	01DF  43			     inc bx
+1  1015	01E0  83 FB 11			     cmp bx, 17
+1  1016	01E3  7E E5			     jng ??000E
+   1017
+   1018					     ; Cifra 2
+   1019					     cls_region	34, 15,	36, 17,	br_cyan, black,	0
+1  1020	01E5  BB 000F			     mov bx, 15
+1  1021	01E8			     ??000F:
+1  1022	01E8  B8 0050			     mov ax, 80
+1  1023	01EB  F7 E3			     mul bx
+1  1024	01ED  05 0022			     add ax, 34
+1  1025	01F0  D1 E0			     shl ax, 1
+1  1026	01F2  8B F8			     mov di, ax	     ;mov di, (15 * 80 + 34) * 2; clear	di, ES:DI points to video memory
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 19
+calc.asm
+
+
+
+1  1027	01F4  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1  1028	01F7  B9 0003			     mov cx, (36 - 34 +	1)
+1  1029	01FA  FC			     cld	     ; direction - forwards
+1  1030	01FB  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1  1031	01FD  43			     inc bx
+1  1032	01FE  83 FB 11			     cmp bx, 17
+1  1033	0201  7E E5			     jng ??000F
+   1034
+   1035					     ; Cifra 3
+   1036					     cls_region	38, 15,	40, 17,	br_cyan, black,	0
+1  1037	0203  BB 000F			     mov bx, 15
+1  1038	0206			     ??0010:
+1  1039	0206  B8 0050			     mov ax, 80
+1  1040	0209  F7 E3			     mul bx
+1  1041	020B  05 0026			     add ax, 38
+1  1042	020E  D1 E0			     shl ax, 1
+1  1043	0210  8B F8			     mov di, ax	     ;mov di, (15 * 80 + 38) * 2; clear	di, ES:DI points to video memory
+1  1044	0212  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1  1045	0215  B9 0003			     mov cx, (40 - 38 +	1)
+1  1046	0218  FC			     cld	     ; direction - forwards
+1  1047	0219  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1  1048	021B  43			     inc bx
+1  1049	021C  83 FB 11			     cmp bx, 17
+1  1050	021F  7E E5			     jng ??0010
+   1051
+   1052					     ; Scadere
+   1053					     cls_region	42, 15,	44, 17,	br_cyan, black,	0
+1  1054	0221  BB 000F			     mov bx, 15
+1  1055	0224			     ??0011:
+1  1056	0224  B8 0050			     mov ax, 80
+1  1057	0227  F7 E3			     mul bx
+1  1058	0229  05 002A			     add ax, 42
+1  1059	022C  D1 E0			     shl ax, 1
+1  1060	022E  8B F8			     mov di, ax	     ;mov di, (15 * 80 + 42) * 2; clear	di, ES:DI points to video memory
+1  1061	0230  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1  1062	0233  B9 0003			     mov cx, (44 - 42 +	1)
+1  1063	0236  FC			     cld	     ; direction - forwards
+1  1064	0237  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1  1065	0239  43			     inc bx
+1  1066	023A  83 FB 11			     cmp bx, 17
+1  1067	023D  7E E5			     jng ??0011
+   1068
+   1069					     ; x^2 = patratul lui x
+   1070					     cls_region	46, 15,	48, 17,	br_cyan, black,	0
+1  1071	023F  BB 000F			     mov bx, 15
+1  1072	0242			     ??0012:
+1  1073	0242  B8 0050			     mov ax, 80
+1  1074	0245  F7 E3			     mul bx
+1  1075	0247  05 002E			     add ax, 46
+1  1076	024A  D1 E0			     shl ax, 1
+1  1077	024C  8B F8			     mov di, ax	     ;mov di, (15 * 80 + 46) * 2; clear	di, ES:DI points to video memory
+1  1078	024E  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1  1079	0251  B9 0003			     mov cx, (48 - 46 +	1)
+1  1080	0254  FC			     cld	     ; direction - forwards
+1  1081	0255  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1  1082	0257  43			     inc bx
+1  1083	0258  83 FB 11			     cmp bx, 17
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 20
+calc.asm
+
+
+
+1  1084	025B  7E E5			     jng ??0012
+   1085
+   1086					     ; Radacina	patrata
+   1087					     cls_region	50, 15,	52, 17,	br_cyan, black,	0
+1  1088	025D  BB 000F			     mov bx, 15
+1  1089	0260			     ??0013:
+1  1090	0260  B8 0050			     mov ax, 80
+1  1091	0263  F7 E3			     mul bx
+1  1092	0265  05 0032			     add ax, 50
+1  1093	0268  D1 E0			     shl ax, 1
+1  1094	026A  8B F8			     mov di, ax	     ;mov di, (15 * 80 + 50) * 2; clear	di, ES:DI points to video memory
+1  1095	026C  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1  1096	026F  B9 0003			     mov cx, (52 - 50 +	1)
+1  1097	0272  FC			     cld	     ; direction - forwards
+1  1098	0273  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1  1099	0275  43			     inc bx
+1  1100	0276  83 FB 11			     cmp bx, 17
+1  1101	0279  7E E5			     jng ??0013
+   1102
+   1103					     ; < Randul	4 de operatori >
+   1104					     ; Cifra 0
+   1105					     cls_region	30, 19,	32, 21,	br_cyan, black,	0
+1  1106	027B  BB 0013			     mov bx, 19
+1  1107	027E			     ??0014:
+1  1108	027E  B8 0050			     mov ax, 80
+1  1109	0281  F7 E3			     mul bx
+1  1110	0283  05 001E			     add ax, 30
+1  1111	0286  D1 E0			     shl ax, 1
+1  1112	0288  8B F8			     mov di, ax	     ;mov di, (19 * 80 + 30) * 2; clear	di, ES:DI points to video memory
+1  1113	028A  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1  1114	028D  B9 0003			     mov cx, (32 - 30 +	1)
+1  1115	0290  FC			     cld	     ; direction - forwards
+1  1116	0291  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1  1117	0293  43			     inc bx
+1  1118	0294  83 FB 15			     cmp bx, 21
+1  1119	0297  7E E5			     jng ??0014
+   1120
+   1121					     ; .
+   1122					     cls_region	34, 19,	36, 21,	br_cyan, black,	0
+1  1123	0299  BB 0013			     mov bx, 19
+1  1124	029C			     ??0015:
+1  1125	029C  B8 0050			     mov ax, 80
+1  1126	029F  F7 E3			     mul bx
+1  1127	02A1  05 0022			     add ax, 34
+1  1128	02A4  D1 E0			     shl ax, 1
+1  1129	02A6  8B F8			     mov di, ax	     ;mov di, (19 * 80 + 34) * 2; clear	di, ES:DI points to video memory
+1  1130	02A8  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1  1131	02AB  B9 0003			     mov cx, (36 - 34 +	1)
+1  1132	02AE  FC			     cld	     ; direction - forwards
+1  1133	02AF  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1  1134	02B1  43			     inc bx
+1  1135	02B2  83 FB 15			     cmp bx, 21
+1  1136	02B5  7E E5			     jng ??0015
+   1137
+   1138					     ; +/-
+   1139					     cls_region	38, 19,	40, 21,	br_cyan, black,	0
+1  1140	02B7  BB 0013			     mov bx, 19
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 21
+calc.asm
+
+
+
+1  1141	02BA			     ??0016:
+1  1142	02BA  B8 0050			     mov ax, 80
+1  1143	02BD  F7 E3			     mul bx
+1  1144	02BF  05 0026			     add ax, 38
+1  1145	02C2  D1 E0			     shl ax, 1
+1  1146	02C4  8B F8			     mov di, ax	     ;mov di, (19 * 80 + 38) * 2; clear	di, ES:DI points to video memory
+1  1147	02C6  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1  1148	02C9  B9 0003			     mov cx, (40 - 38 +	1)
+1  1149	02CC  FC			     cld	     ; direction - forwards
+1  1150	02CD  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1  1151	02CF  43			     inc bx
+1  1152	02D0  83 FB 15			     cmp bx, 21
+1  1153	02D3  7E E5			     jng ??0016
+   1154
+   1155					     ; Adunare
+   1156					     cls_region	42, 19,	44, 21,	br_cyan, black,	0
+1  1157	02D5  BB 0013			     mov bx, 19
+1  1158	02D8			     ??0017:
+1  1159	02D8  B8 0050			     mov ax, 80
+1  1160	02DB  F7 E3			     mul bx
+1  1161	02DD  05 002A			     add ax, 42
+1  1162	02E0  D1 E0			     shl ax, 1
+1  1163	02E2  8B F8			     mov di, ax	     ;mov di, (19 * 80 + 42) * 2; clear	di, ES:DI points to video memory
+1  1164	02E4  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1  1165	02E7  B9 0003			     mov cx, (44 - 42 +	1)
+1  1166	02EA  FC			     cld	     ; direction - forwards
+1  1167	02EB  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1  1168	02ED  43			     inc bx
+1  1169	02EE  83 FB 15			     cmp bx, 21
+1  1170	02F1  7E E5			     jng ??0017
+   1171
+   1172					     ; x^3 = cubul lui x
+   1173					     cls_region	46, 19,	48, 21,	br_cyan, black,	0
+1  1174	02F3  BB 0013			     mov bx, 19
+1  1175	02F6			     ??0018:
+1  1176	02F6  B8 0050			     mov ax, 80
+1  1177	02F9  F7 E3			     mul bx
+1  1178	02FB  05 002E			     add ax, 46
+1  1179	02FE  D1 E0			     shl ax, 1
+1  1180	0300  8B F8			     mov di, ax	     ;mov di, (19 * 80 + 46) * 2; clear	di, ES:DI points to video memory
+1  1181	0302  B8 B000			     mov ax, br_cyan * 4096 + black * 256 + 0
+1  1182	0305  B9 0003			     mov cx, (48 - 46 +	1)
+1  1183	0308  FC			     cld	     ; direction - forwards
+1  1184	0309  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1  1185	030B  43			     inc bx
+1  1186	030C  83 FB 15			     cmp bx, 21
+1  1187	030F  7E E5			     jng ??0018
+   1188
+   1189					     ; Egal
+   1190					     cls_region	50, 19,	52, 21,	br_red,	br_white, 0
+1  1191	0311  BB 0013			     mov bx, 19
+1  1192	0314			     ??0019:
+1  1193	0314  B8 0050			     mov ax, 80
+1  1194	0317  F7 E3			     mul bx
+1  1195	0319  05 0032			     add ax, 50
+1  1196	031C  D1 E0			     shl ax, 1
+1  1197	031E  8B F8			     mov di, ax	     ;mov di, (19 * 80 + 50) * 2; clear	di, ES:DI points to video memory
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 22
+calc.asm
+
+
+
+1  1198	0320  B8 CF00			     mov ax, br_red * 4096 + br_white *	256 + 0
+1  1199	0323  B9 0003			     mov cx, (52 - 50 +	1)
+1  1200	0326  FC			     cld	     ; direction - forwards
+1  1201	0327  F3> AB			     rep stosw	     ; output character	at ES:[DI]
+1  1202	0329  43			     inc bx
+1  1203	032A  83 FB 15			     cmp bx, 21
+1  1204	032D  7E E5			     jng ??0019
+   1205
+   1206					     ; < Randul	1 de operatori >
+   1207					     bios_putc 31, 8, '7'
+1  1208	032F  BB 0008			     mov bx, 8
+1  1209	0332  B8 0050			     mov ax, 80
+1  1210	0335  F7 E3			     mul bx
+1  1211	0337  05 001F			     add ax, 31
+1  1212	033A  D1 E0			     shl ax, 1
+1  1213	033C  8B F8			     mov di, ax
+1  1214	033E  B0 37			     mov al, '7'
+1  1215	0340  AA			     stosb
+   1216					     bios_putc 35, 8, '8'
+1  1217	0341  BB 0008			     mov bx, 8
+1  1218	0344  B8 0050			     mov ax, 80
+1  1219	0347  F7 E3			     mul bx
+1  1220	0349  05 0023			     add ax, 35
+1  1221	034C  D1 E0			     shl ax, 1
+1  1222	034E  8B F8			     mov di, ax
+1  1223	0350  B0 38			     mov al, '8'
+1  1224	0352  AA			     stosb
+   1225					     bios_putc 39, 8, '9'
+1  1226	0353  BB 0008			     mov bx, 8
+1  1227	0356  B8 0050			     mov ax, 80
+1  1228	0359  F7 E3			     mul bx
+1  1229	035B  05 0027			     add ax, 39
+1  1230	035E  D1 E0			     shl ax, 1
+1  1231	0360  8B F8			     mov di, ax
+1  1232	0362  B0 39			     mov al, '9'
+1  1233	0364  AA			     stosb
+   1234					     bios_putc 43, 8, '/'
+1  1235	0365  BB 0008			     mov bx, 8
+1  1236	0368  B8 0050			     mov ax, 80
+1  1237	036B  F7 E3			     mul bx
+1  1238	036D  05 002B			     add ax, 43
+1  1239	0370  D1 E0			     shl ax, 1
+1  1240	0372  8B F8			     mov di, ax
+1  1241	0374  B0 2F			     mov al, '/'
+1  1242	0376  AA			     stosb
+   1243					     bios_putc 47, 8, 227
+1  1244	0377  BB 0008			     mov bx, 8
+1  1245	037A  B8 0050			     mov ax, 80
+1  1246	037D  F7 E3			     mul bx
+1  1247	037F  05 002F			     add ax, 47
+1  1248	0382  D1 E0			     shl ax, 1
+1  1249	0384  8B F8			     mov di, ax
+1  1250	0386  B0 E3			     mov al, 227
+1  1251	0388  AA			     stosb
+   1252					     bios_putc 51, 8, 'C'
+1  1253	0389  BB 0008			     mov bx, 8
+1  1254	038C  B8 0050			     mov ax, 80
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 23
+calc.asm
+
+
+
+1  1255	038F  F7 E3			     mul bx
+1  1256	0391  05 0033			     add ax, 51
+1  1257	0394  D1 E0			     shl ax, 1
+1  1258	0396  8B F8			     mov di, ax
+1  1259	0398  B0 43			     mov al, 'C'
+1  1260	039A  AA			     stosb
+   1261
+   1262					     ; < Randul	2 de operatori >
+   1263					     bios_putc 31, 12, '4'
+1  1264	039B  BB 000C			     mov bx, 12
+1  1265	039E  B8 0050			     mov ax, 80
+1  1266	03A1  F7 E3			     mul bx
+1  1267	03A3  05 001F			     add ax, 31
+1  1268	03A6  D1 E0			     shl ax, 1
+1  1269	03A8  8B F8			     mov di, ax
+1  1270	03AA  B0 34			     mov al, '4'
+1  1271	03AC  AA			     stosb
+   1272					     bios_putc 35, 12, '5'
+1  1273	03AD  BB 000C			     mov bx, 12
+1  1274	03B0  B8 0050			     mov ax, 80
+1  1275	03B3  F7 E3			     mul bx
+1  1276	03B5  05 0023			     add ax, 35
+1  1277	03B8  D1 E0			     shl ax, 1
+1  1278	03BA  8B F8			     mov di, ax
+1  1279	03BC  B0 35			     mov al, '5'
+1  1280	03BE  AA			     stosb
+   1281					     bios_putc 39, 12, '6'
+1  1282	03BF  BB 000C			     mov bx, 12
+1  1283	03C2  B8 0050			     mov ax, 80
+1  1284	03C5  F7 E3			     mul bx
+1  1285	03C7  05 0027			     add ax, 39
+1  1286	03CA  D1 E0			     shl ax, 1
+1  1287	03CC  8B F8			     mov di, ax
+1  1288	03CE  B0 36			     mov al, '6'
+1  1289	03D0  AA			     stosb
+   1290					     bios_putc 43, 12, '*'
+1  1291	03D1  BB 000C			     mov bx, 12
+1  1292	03D4  B8 0050			     mov ax, 80
+1  1293	03D7  F7 E3			     mul bx
+1  1294	03D9  05 002B			     add ax, 43
+1  1295	03DC  D1 E0			     shl ax, 1
+1  1296	03DE  8B F8			     mov di, ax
+1  1297	03E0  B0 2A			     mov al, '*'
+1  1298	03E2  AA			     stosb
+   1299					     bios_putc 46, 12, '1'
+1  1300	03E3  BB 000C			     mov bx, 12
+1  1301	03E6  B8 0050			     mov ax, 80
+1  1302	03E9  F7 E3			     mul bx
+1  1303	03EB  05 002E			     add ax, 46
+1  1304	03EE  D1 E0			     shl ax, 1
+1  1305	03F0  8B F8			     mov di, ax
+1  1306	03F2  B0 31			     mov al, '1'
+1  1307	03F4  AA			     stosb
+   1308					     bios_putc 47, 12, '/'
+1  1309	03F5  BB 000C			     mov bx, 12
+1  1310	03F8  B8 0050			     mov ax, 80
+1  1311	03FB  F7 E3			     mul bx
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 24
+calc.asm
+
+
+
+1  1312	03FD  05 002F			     add ax, 47
+1  1313	0400  D1 E0			     shl ax, 1
+1  1314	0402  8B F8			     mov di, ax
+1  1315	0404  B0 2F			     mov al, '/'
+1  1316	0406  AA			     stosb
+   1317					     bios_putc 48, 12, 'x'
+1  1318	0407  BB 000C			     mov bx, 12
+1  1319	040A  B8 0050			     mov ax, 80
+1  1320	040D  F7 E3			     mul bx
+1  1321	040F  05 0030			     add ax, 48
+1  1322	0412  D1 E0			     shl ax, 1
+1  1323	0414  8B F8			     mov di, ax
+1  1324	0416  B0 78			     mov al, 'x'
+1  1325	0418  AA			     stosb
+   1326					     bios_putc 51, 12, '<'
+1  1327	0419  BB 000C			     mov bx, 12
+1  1328	041C  B8 0050			     mov ax, 80
+1  1329	041F  F7 E3			     mul bx
+1  1330	0421  05 0033			     add ax, 51
+1  1331	0424  D1 E0			     shl ax, 1
+1  1332	0426  8B F8			     mov di, ax
+1  1333	0428  B0 3C			     mov al, '<'
+1  1334	042A  AA			     stosb
+   1335
+   1336					     ; < Randul	3 de operatori >
+   1337					     bios_putc 31, 16, '1'
+1  1338	042B  BB 0010			     mov bx, 16
+1  1339	042E  B8 0050			     mov ax, 80
+1  1340	0431  F7 E3			     mul bx
+1  1341	0433  05 001F			     add ax, 31
+1  1342	0436  D1 E0			     shl ax, 1
+1  1343	0438  8B F8			     mov di, ax
+1  1344	043A  B0 31			     mov al, '1'
+1  1345	043C  AA			     stosb
+   1346					     bios_putc 35, 16, '2'
+1  1347	043D  BB 0010			     mov bx, 16
+1  1348	0440  B8 0050			     mov ax, 80
+1  1349	0443  F7 E3			     mul bx
+1  1350	0445  05 0023			     add ax, 35
+1  1351	0448  D1 E0			     shl ax, 1
+1  1352	044A  8B F8			     mov di, ax
+1  1353	044C  B0 32			     mov al, '2'
+1  1354	044E  AA			     stosb
+   1355					     bios_putc 39, 16, '3'
+1  1356	044F  BB 0010			     mov bx, 16
+1  1357	0452  B8 0050			     mov ax, 80
+1  1358	0455  F7 E3			     mul bx
+1  1359	0457  05 0027			     add ax, 39
+1  1360	045A  D1 E0			     shl ax, 1
+1  1361	045C  8B F8			     mov di, ax
+1  1362	045E  B0 33			     mov al, '3'
+1  1363	0460  AA			     stosb
+   1364					     bios_putc 43, 16, '-'
+1  1365	0461  BB 0010			     mov bx, 16
+1  1366	0464  B8 0050			     mov ax, 80
+1  1367	0467  F7 E3			     mul bx
+1  1368	0469  05 002B			     add ax, 43
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 25
+calc.asm
+
+
+
+1  1369	046C  D1 E0			     shl ax, 1
+1  1370	046E  8B F8			     mov di, ax
+1  1371	0470  B0 2D			     mov al, '-'
+1  1372	0472  AA			     stosb
+   1373					     bios_putc 47, 16, 'x'
+1  1374	0473  BB 0010			     mov bx, 16
+1  1375	0476  B8 0050			     mov ax, 80
+1  1376	0479  F7 E3			     mul bx
+1  1377	047B  05 002F			     add ax, 47
+1  1378	047E  D1 E0			     shl ax, 1
+1  1379	0480  8B F8			     mov di, ax
+1  1380	0482  B0 78			     mov al, 'x'
+1  1381	0484  AA			     stosb
+   1382					     bios_putc 48, 16, 253
+1  1383	0485  BB 0010			     mov bx, 16
+1  1384	0488  B8 0050			     mov ax, 80
+1  1385	048B  F7 E3			     mul bx
+1  1386	048D  05 0030			     add ax, 48
+1  1387	0490  D1 E0			     shl ax, 1
+1  1388	0492  8B F8			     mov di, ax
+1  1389	0494  B0 FD			     mov al, 253
+1  1390	0496  AA			     stosb
+   1391					     bios_putc 51, 16, 251
+1  1392	0497  BB 0010			     mov bx, 16
+1  1393	049A  B8 0050			     mov ax, 80
+1  1394	049D  F7 E3			     mul bx
+1  1395	049F  05 0033			     add ax, 51
+1  1396	04A2  D1 E0			     shl ax, 1
+1  1397	04A4  8B F8			     mov di, ax
+1  1398	04A6  B0 FB			     mov al, 251
+1  1399	04A8  AA			     stosb
+   1400
+   1401					     ; < Randul	4 de operatori >
+   1402					     bios_putc 31, 20, '0'
+1  1403	04A9  BB 0014			     mov bx, 20
+1  1404	04AC  B8 0050			     mov ax, 80
+1  1405	04AF  F7 E3			     mul bx
+1  1406	04B1  05 001F			     add ax, 31
+1  1407	04B4  D1 E0			     shl ax, 1
+1  1408	04B6  8B F8			     mov di, ax
+1  1409	04B8  B0 30			     mov al, '0'
+1  1410	04BA  AA			     stosb
+   1411					     bios_putc 35, 20, '.'
+1  1412	04BB  BB 0014			     mov bx, 20
+1  1413	04BE  B8 0050			     mov ax, 80
+1  1414	04C1  F7 E3			     mul bx
+1  1415	04C3  05 0023			     add ax, 35
+1  1416	04C6  D1 E0			     shl ax, 1
+1  1417	04C8  8B F8			     mov di, ax
+1  1418	04CA  B0 2E			     mov al, '.'
+1  1419	04CC  AA			     stosb
+   1420					     bios_putc 39, 20, 241
+1  1421	04CD  BB 0014			     mov bx, 20
+1  1422	04D0  B8 0050			     mov ax, 80
+1  1423	04D3  F7 E3			     mul bx
+1  1424	04D5  05 0027			     add ax, 39
+1  1425	04D8  D1 E0			     shl ax, 1
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 26
+calc.asm
+
+
+
+1  1426	04DA  8B F8			     mov di, ax
+1  1427	04DC  B0 F1			     mov al, 241
+1  1428	04DE  AA			     stosb
+   1429					     bios_putc 43, 20, '+'
+1  1430	04DF  BB 0014			     mov bx, 20
+1  1431	04E2  B8 0050			     mov ax, 80
+1  1432	04E5  F7 E3			     mul bx
+1  1433	04E7  05 002B			     add ax, 43
+1  1434	04EA  D1 E0			     shl ax, 1
+1  1435	04EC  8B F8			     mov di, ax
+1  1436	04EE  B0 2B			     mov al, '+'
+1  1437	04F0  AA			     stosb
+   1438					     bios_putc 46, 20, 'x'
+1  1439	04F1  BB 0014			     mov bx, 20
+1  1440	04F4  B8 0050			     mov ax, 80
+1  1441	04F7  F7 E3			     mul bx
+1  1442	04F9  05 002E			     add ax, 46
+1  1443	04FC  D1 E0			     shl ax, 1
+1  1444	04FE  8B F8			     mov di, ax
+1  1445	0500  B0 78			     mov al, 'x'
+1  1446	0502  AA			     stosb
+   1447					     bios_putc 47, 20, '^'
+1  1448	0503  BB 0014			     mov bx, 20
+1  1449	0506  B8 0050			     mov ax, 80
+1  1450	0509  F7 E3			     mul bx
+1  1451	050B  05 002F			     add ax, 47
+1  1452	050E  D1 E0			     shl ax, 1
+1  1453	0510  8B F8			     mov di, ax
+1  1454	0512  B0 5E			     mov al, '^'
+1  1455	0514  AA			     stosb
+   1456					     bios_putc 48, 20, '3'
+1  1457	0515  BB 0014			     mov bx, 20
+1  1458	0518  B8 0050			     mov ax, 80
+1  1459	051B  F7 E3			     mul bx
+1  1460	051D  05 0030			     add ax, 48
+1  1461	0520  D1 E0			     shl ax, 1
+1  1462	0522  8B F8			     mov di, ax
+1  1463	0524  B0 33			     mov al, '3'
+1  1464	0526  AA			     stosb
+   1465					     bios_putc 51, 20, '='
+1  1466	0527  BB 0014			     mov bx, 20
+1  1467	052A  B8 0050			     mov ax, 80
+1  1468	052D  F7 E3			     mul bx
+1  1469	052F  05 0033			     add ax, 51
+1  1470	0532  D1 E0			     shl ax, 1
+1  1471	0534  8B F8			     mov di, ax
+1  1472	0536  B0 3D			     mov al, '='
+1  1473	0538  AA			     stosb
+   1474
+   1475					     ; < Rama calculator >
+   1476					     ; colt stanga sus
+   1477					     bios_putc 28, 1, 201
+1  1478	0539  BB 0001			     mov bx, 1
+1  1479	053C  B8 0050			     mov ax, 80
+1  1480	053F  F7 E3			     mul bx
+1  1481	0541  05 001C			     add ax, 28
+1  1482	0544  D1 E0			     shl ax, 1
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 27
+calc.asm
+
+
+
+1  1483	0546  8B F8			     mov di, ax
+1  1484	0548  B0 C9			     mov al, 201
+1  1485	054A  AA			     stosb
+   1486					     ; colt dreapta sus
+   1487					     bios_putc 54, 1, 187
+1  1488	054B  BB 0001			     mov bx, 1
+1  1489	054E  B8 0050			     mov ax, 80
+1  1490	0551  F7 E3			     mul bx
+1  1491	0553  05 0036			     add ax, 54
+1  1492	0556  D1 E0			     shl ax, 1
+1  1493	0558  8B F8			     mov di, ax
+1  1494	055A  B0 BB			     mov al, 187
+1  1495	055C  AA			     stosb
+   1496					     ; colt stanga jos
+   1497					     bios_putc 28, 23, 200
+1  1498	055D  BB 0017			     mov bx, 23
+1  1499	0560  B8 0050			     mov ax, 80
+1  1500	0563  F7 E3			     mul bx
+1  1501	0565  05 001C			     add ax, 28
+1  1502	0568  D1 E0			     shl ax, 1
+1  1503	056A  8B F8			     mov di, ax
+1  1504	056C  B0 C8			     mov al, 200
+1  1505	056E  AA			     stosb
+   1506					     ; colt dreapta jos
+   1507					     bios_putc 54, 23, 188
+1  1508	056F  BB 0017			     mov bx, 23
+1  1509	0572  B8 0050			     mov ax, 80
+1  1510	0575  F7 E3			     mul bx
+1  1511	0577  05 0036			     add ax, 54
+1  1512	057A  D1 E0			     shl ax, 1
+1  1513	057C  8B F8			     mov di, ax
+1  1514	057E  B0 BC			     mov al, 188
+1  1515	0580  AA			     stosb
+   1516
+   1517					     ; linie orizontala	sus
+   1518					     bios_hputc_color 29, 1, 205, br_white, black, 25
+1  1519	0581  BB 0001			     mov bx, 1
+1  1520	0584  B8 0050			     mov ax, 80
+1  1521	0587  F7 E3			     mul bx
+1  1522	0589  05 001D			     add ax, 29
+1  1523	058C  D1 E0			     shl ax, 1
+1  1524	058E  8B F8			     mov di, ax
+1  1525	0590  B8 F0CD			     mov ax, br_white *	4096 + black * 256 + 205
+1  1526	0593  B9 0019			     mov cx, 25
+1  1527	0596  FC			     cld
+1  1528	0597  F3> AB			     rep stosw
+   1529					     ; linie orizontala	jos
+   1530					     bios_hputc_color 29, 23, 205, br_white, black, 25
+1  1531	0599  BB 0017			     mov bx, 23
+1  1532	059C  B8 0050			     mov ax, 80
+1  1533	059F  F7 E3			     mul bx
+1  1534	05A1  05 001D			     add ax, 29
+1  1535	05A4  D1 E0			     shl ax, 1
+1  1536	05A6  8B F8			     mov di, ax
+1  1537	05A8  B8 F0CD			     mov ax, br_white *	4096 + black * 256 + 205
+1  1538	05AB  B9 0019			     mov cx, 25
+1  1539	05AE  FC			     cld
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 28
+calc.asm
+
+
+
+1  1540	05AF  F3> AB			     rep stosw
+   1541
+   1542					     ; linie verticala stanga
+   1543					     bios_vputc_color 28, 2, 186, br_white, black, 21
+1  1544	05B1  BB 0002			     mov bx, 2
+1  1545	05B4			     ??001A:
+1  1546	05B4  B8 0050			     mov ax, 80
+1  1547	05B7  F7 E3			     mul bx
+1  1548	05B9  05 001C			     add ax, 28
+1  1549	05BC  D1 E0			     shl ax, 1
+1  1550	05BE  8B F8			     mov di, ax
+1  1551	05C0  B8 F0BA			     mov ax, br_white *	4096 + black * 256 + 186
+1  1552	05C3  AB			     stosw
+1  1553	05C4  43			     inc bx
+1  1554	05C5  83 FB 16			     cmp bx, 2+21-1
+1  1555	05C8  7E EA			     jng ??001A
+   1556					     ; linie verticala dreapta
+   1557					     bios_vputc_color 54, 2, 186, br_white, black, 21
+1  1558	05CA  BB 0002			     mov bx, 2
+1  1559	05CD			     ??001B:
+1  1560	05CD  B8 0050			     mov ax, 80
+1  1561	05D0  F7 E3			     mul bx
+1  1562	05D2  05 0036			     add ax, 54
+1  1563	05D5  D1 E0			     shl ax, 1
+1  1564	05D7  8B F8			     mov di, ax
+1  1565	05D9  B8 F0BA			     mov ax, br_white *	4096 + black * 256 + 186
+1  1566	05DC  AB			     stosw
+1  1567	05DD  43			     inc bx
+1  1568	05DE  83 FB 16			     cmp bx, 2+21-1
+1  1569	05E1  7E EA			     jng ??001B
+   1570
+   1571					     ; < Rama rezultat calcule >
+   1572					     ; colt stanga sus
+   1573					     bios_putc 30, 3, 218
+1  1574	05E3  BB 0003			     mov bx, 3
+1  1575	05E6  B8 0050			     mov ax, 80
+1  1576	05E9  F7 E3			     mul bx
+1  1577	05EB  05 001E			     add ax, 30
+1  1578	05EE  D1 E0			     shl ax, 1
+1  1579	05F0  8B F8			     mov di, ax
+1  1580	05F2  B0 DA			     mov al, 218
+1  1581	05F4  AA			     stosb
+   1582					     ; colt dreapta sus
+   1583					     bios_putc 52, 3, 191
+1  1584	05F5  BB 0003			     mov bx, 3
+1  1585	05F8  B8 0050			     mov ax, 80
+1  1586	05FB  F7 E3			     mul bx
+1  1587	05FD  05 0034			     add ax, 52
+1  1588	0600  D1 E0			     shl ax, 1
+1  1589	0602  8B F8			     mov di, ax
+1  1590	0604  B0 BF			     mov al, 191
+1  1591	0606  AA			     stosb
+   1592					     ; colt stanga jos
+   1593					     bios_putc 30, 5, 192
+1  1594	0607  BB 0005			     mov bx, 5
+1  1595	060A  B8 0050			     mov ax, 80
+1  1596	060D  F7 E3			     mul bx
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 29
+calc.asm
+
+
+
+1  1597	060F  05 001E			     add ax, 30
+1  1598	0612  D1 E0			     shl ax, 1
+1  1599	0614  8B F8			     mov di, ax
+1  1600	0616  B0 C0			     mov al, 192
+1  1601	0618  AA			     stosb
+   1602					     ; colt dreapta jos
+   1603					     bios_putc 52, 5, 217
+1  1604	0619  BB 0005			     mov bx, 5
+1  1605	061C  B8 0050			     mov ax, 80
+1  1606	061F  F7 E3			     mul bx
+1  1607	0621  05 0034			     add ax, 52
+1  1608	0624  D1 E0			     shl ax, 1
+1  1609	0626  8B F8			     mov di, ax
+1  1610	0628  B0 D9			     mov al, 217
+1  1611	062A  AA			     stosb
+   1612
+   1613					     ; linie orizontala	sus
+   1614					     bios_hputc_color 31, 3, 196, white, black,	21
+1  1615	062B  BB 0003			     mov bx, 3
+1  1616	062E  B8 0050			     mov ax, 80
+1  1617	0631  F7 E3			     mul bx
+1  1618	0633  05 001F			     add ax, 31
+1  1619	0636  D1 E0			     shl ax, 1
+1  1620	0638  8B F8			     mov di, ax
+1  1621	063A  B8 70C4			     mov ax, white * 4096 + black * 256	+ 196
+1  1622	063D  B9 0015			     mov cx, 21
+1  1623	0640  FC			     cld
+1  1624	0641  F3> AB			     rep stosw
+   1625					     ; linie orizontala	jos
+   1626					     bios_hputc_color 31, 5, 196, white, black,	21
+1  1627	0643  BB 0005			     mov bx, 5
+1  1628	0646  B8 0050			     mov ax, 80
+1  1629	0649  F7 E3			     mul bx
+1  1630	064B  05 001F			     add ax, 31
+1  1631	064E  D1 E0			     shl ax, 1
+1  1632	0650  8B F8			     mov di, ax
+1  1633	0652  B8 70C4			     mov ax, white * 4096 + black * 256	+ 196
+1  1634	0655  B9 0015			     mov cx, 21
+1  1635	0658  FC			     cld
+1  1636	0659  F3> AB			     rep stosw
+   1637
+   1638					     ; linie verticala stanga
+   1639					     bios_putc 30, 4, 179
+1  1640	065B  BB 0004			     mov bx, 4
+1  1641	065E  B8 0050			     mov ax, 80
+1  1642	0661  F7 E3			     mul bx
+1  1643	0663  05 001E			     add ax, 30
+1  1644	0666  D1 E0			     shl ax, 1
+1  1645	0668  8B F8			     mov di, ax
+1  1646	066A  B0 B3			     mov al, 179
+1  1647	066C  AA			     stosb
+   1648					     ; linie verticala dreapta
+   1649					     bios_putc 52, 4, 179
+1  1650	066D  BB 0004			     mov bx, 4
+1  1651	0670  B8 0050			     mov ax, 80
+1  1652	0673  F7 E3			     mul bx
+1  1653	0675  05 0034			     add ax, 52
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 30
+calc.asm
+
+
+
+1  1654	0678  D1 E0			     shl ax, 1
+1  1655	067A  8B F8			     mov di, ax
+1  1656	067C  B0 B3			     mov al, 179
+1  1657	067E  AA			     stosb
+   1658
+   1659					     end_video
+1  1660	067F  07			     pop es
+1  1661	0680  58			     pop ax
+   1662
+   1663					     ; Initializam rezultatul cu valoarea 0
+   1664					     strcat rezultat, zero
+1  1665	0681  BF 0062r			 lea di, rezultat
+1  1666	0684  BE 0098r			     lea si, zero
+1  1667	0687  9A 00000000se		     call far ptr strcat_proc
+   1668					     strlen rezultat, len
+1  1669	068C  BF 0062r			 lea di, rezultat
+1  1670	068F  9A 00000000se		     call strlen_proc
+1  1671	0694  A3 0090r			     mov [len],	ax
+   1672
+   1673	0697			     din_nou:
+   1674					     ; Scriem rezultatul pe ecran
+   1675					     start_video
+1  1676	0697  50			     push ax
+1  1677	0698  06			     push es
+1  1678	0699  B8 B800			     mov ax, 0b800h
+1  1679	069C  8E C0			     mov es, ax
+   1680	069E  B8 0034			     mov ax, 31+max
+   1681	06A1  2B 06 0090r		     sub ax, len
+   1682	06A5  A3 008Er			     mov [x], ax
+   1683					     ; Stergem ecranul
+   1684					     bios_hputc_color 31, 4, 0,	white, black, max
+1  1685	06A8  BB 0004			     mov bx, 4
+1  1686	06AB  B8 0050			     mov ax, 80
+1  1687	06AE  F7 E3			     mul bx
+1  1688	06B0  05 001F			     add ax, 31
+1  1689	06B3  D1 E0			     shl ax, 1
+1  1690	06B5  8B F8			     mov di, ax
+1  1691	06B7  B8 7000			     mov ax, white * 4096 + black * 256	+ 0
+1  1692	06BA  B9 0015			     mov cx, max
+1  1693	06BD  FC			     cld
+1  1694	06BE  F3> AB			     rep stosw
+   1695					     ; Afisam rezultatul
+   1696					     bios_puts x, 4, rezultat, white, black, len
+1  1697	06C0  BE 0062r			 lea si, rezultat
+1  1698	06C3  BB 0004			     mov bx, 4
+1  1699	06C6  B8 0050			     mov ax, 80
+1  1700	06C9  F7 E3			     mul bx
+1  1701	06CB  03 06 008Er		     add ax, x
+1  1702	06CF  D1 E0			     shl ax, 1
+1  1703	06D1  8B F8			     mov di, ax
+1  1704	06D3  B4 70			     mov ah, white * 16	+ black
+1  1705	06D5  8B 0E 0090r		     mov cx, len
+1  1706	06D9  FC			     cld
+1  1707	06DA			     ??001C:
+1  1708	06DA  83 F9 00			     cmp cx, 0
+1  1709	06DD  74 05			     je	??001D
+1  1710	06DF  AC			     lodsb
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 31
+calc.asm
+
+
+
+1  1711	06E0  AB			     stosw
+1  1712	06E1  49			     dec cx
+1  1713	06E2  EB F6			     jmp ??001C
+1  1714	06E4			     ??001D:
+   1715					     end_video
+1  1716	06E4  07			     pop es
+1  1717	06E5  58			     pop ax
+   1718
+   1719					     ; Citim de	la tastatura
+   1720	06E6  B4 08			     mov ah, 08h
+   1721	06E8  CD 21			     int 21h
+   1722
+   1723					     ; Daca apasam ESC programul se termina
+   1724	06EA  3C 1B			     cmp al, kbd_esc
+   1725	06EC  74 18			     je	gata
+   1726
+   1727					     ; Cautam in lista noastra operatia	si sarim direct	la ea
+   1728	06EE  BF 0003r			     lea di, case
+   1729	06F1  8B 0E 0022r		     mov cx, cases
+   1730	06F5  FC			     cld
+   1731	06F6  F2> AE			     repne scasb
+   1732	06F8  75 10			     jne et_default
+   1733
+   1734	06FA  4F			     dec di
+   1735	06FB  BB 0003r			     lea bx, case
+   1736	06FE  2B FB			     sub di, bx
+   1737	0700  D1 E7			     shl di, 1 ; inmultim cu 4 - 32 biti
+   1738	0702  FF A5 0024r		     jmp casejmp[di]
+   1739
+   1740	0706			     gata:
+   1741					     ; Inchidem	programul
+   1742	0706  B4 4C			 mov ah, 4Ch
+   1743	0708  CD 21			 int 21h
+   1744
+   1745	070A			     et_default:
+   1746	070A  E9 0999			     jmp et
+   1747
+   1748				     ; Cifra 0
+   1749	070D			     et_0:
+   1750					     ; Verificam daca trebuie sa stergem rezultatul
+   1751	070D  80 3E 0135r 00		     cmp byte ptr [clear], 0
+   1752	0712  74 08			     je	et_0c
+   1753					     ; Stergem rezultatul
+   1754	0714  C6 06 0135r 00		     mov byte ptr [clear], 0
+   1755	0719  EB 26 90			     jmp et_00c
+   1756	071C			     et_0c:
+   1757					     strlen rezultat, len
+1  1758	071C  BF 0062r			 lea di, rezultat
+1  1759	071F  9A 00000000se		     call strlen_proc
+1  1760	0724  A3 0090r			     mov [len],	ax
+   1761	0727  3D 0014			     cmp ax, max-1
+   1762	072A  7D 2D			     jge et_0_
+   1763					     strcmp rezultat, zero, zero_initial
+1  1764	072C  BE 0062r			 lea si, rezultat
+1  1765	072F  BF 0098r			     lea di, zero
+1  1766	0732  9A 00000000se		     call far ptr strcmp_proc
+1  1767	0737  A3 00B2r			     mov [zero_initial], ax
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 32
+calc.asm
+
+
+
+   1768	073A  83 3E 00B2r 00		     cmp word ptr [zero_initial], 0
+   1769	073F  75 0D			     jne et_00_
+   1770	0741			     et_00c:
+   1771					     memset rezultat, 0, max+1
+1  1772	0741  B0 00			     mov al, 0
+1  1773	0743  BF 0062r			     lea di, rezultat
+1  1774	0746  B9 0016			     mov cx, max+1
+1  1775	0749  9A 00000000se		     call far ptr memset_proc
+   1776	074E			     et_00_:
+   1777					     strcat rezultat, zero
+1  1778	074E  BF 0062r			 lea di, rezultat
+1  1779	0751  BE 0098r			     lea si, zero
+1  1780	0754  9A 00000000se		     call far ptr strcat_proc
+   1781	0759			     et_0_:
+   1782	0759  E9 094A			     jmp et
+   1783
+   1784				     ; Cifra 1
+   1785	075C			     et_1:
+   1786					     ; Verificam daca trebuie sa stergem rezultatul
+   1787	075C  80 3E 0135r 00		     cmp byte ptr [clear], 0
+   1788	0761  74 08			     je	et_1c
+   1789					     ; Stergem rezultatul
+   1790	0763  C6 06 0135r 00		     mov byte ptr [clear], 0
+   1791	0768  EB 26 90			     jmp et_11c
+   1792	076B			     et_1c:
+   1793					     ; Verificam lungimea maxima a sirului
+   1794					     strlen rezultat, len
+1  1795	076B  BF 0062r			 lea di, rezultat
+1  1796	076E  9A 00000000se		     call strlen_proc
+1  1797	0773  A3 0090r			     mov [len],	ax
+   1798	0776  3D 0014			     cmp ax, max-1
+   1799	0779  7D 2D			     jge et_1_
+   1800					     strcmp rezultat, zero, zero_initial
+1  1801	077B  BE 0062r			 lea si, rezultat
+1  1802	077E  BF 0098r			     lea di, zero
+1  1803	0781  9A 00000000se		     call far ptr strcmp_proc
+1  1804	0786  A3 00B2r			     mov [zero_initial], ax
+   1805	0789  83 3E 00B2r 00		     cmp word ptr [zero_initial], 0
+   1806	078E  75 0D			     jne et_11_
+   1807	0790			     et_11c:
+   1808					     memset rezultat, 0, max+1
+1  1809	0790  B0 00			     mov al, 0
+1  1810	0792  BF 0062r			     lea di, rezultat
+1  1811	0795  B9 0016			     mov cx, max+1
+1  1812	0798  9A 00000000se		     call far ptr memset_proc
+   1813	079D			     et_11_:
+   1814					     strcat rezultat, unu
+1  1815	079D  BF 0062r			 lea di, rezultat
+1  1816	07A0  BE 009Ar			     lea si, unu
+1  1817	07A3  9A 00000000se		     call far ptr strcat_proc
+   1818	07A8			     et_1_:
+   1819	07A8  E9 08FB			     jmp et
+   1820
+   1821				     ; Cifra 2
+   1822	07AB			     et_2:
+   1823					     ; Verificam daca trebuie sa stergem rezultatul
+   1824	07AB  80 3E 0135r 00		     cmp byte ptr [clear], 0
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 33
+calc.asm
+
+
+
+   1825	07B0  74 08			     je	et_2c
+   1826					     ; Stergem rezultatul
+   1827	07B2  C6 06 0135r 00		     mov byte ptr [clear], 0
+   1828	07B7  EB 26 90			     jmp et_22c
+   1829	07BA			     et_2c:
+   1830					     strlen rezultat, len
+1  1831	07BA  BF 0062r			 lea di, rezultat
+1  1832	07BD  9A 00000000se		     call strlen_proc
+1  1833	07C2  A3 0090r			     mov [len],	ax
+   1834	07C5  3D 0014			     cmp ax, max-1
+   1835	07C8  7D 2D			     jge et_2_
+   1836					     strcmp rezultat, zero, zero_initial
+1  1837	07CA  BE 0062r			 lea si, rezultat
+1  1838	07CD  BF 0098r			     lea di, zero
+1  1839	07D0  9A 00000000se		     call far ptr strcmp_proc
+1  1840	07D5  A3 00B2r			     mov [zero_initial], ax
+   1841	07D8  83 3E 00B2r 00		     cmp word ptr [zero_initial], 0
+   1842	07DD  75 0D			     jne et_22_
+   1843	07DF			     et_22c:
+   1844					     memset rezultat, 0, max+1
+1  1845	07DF  B0 00			     mov al, 0
+1  1846	07E1  BF 0062r			     lea di, rezultat
+1  1847	07E4  B9 0016			     mov cx, max+1
+1  1848	07E7  9A 00000000se		     call far ptr memset_proc
+   1849	07EC			     et_22_:
+   1850					     strcat rezultat, doi
+1  1851	07EC  BF 0062r			 lea di, rezultat
+1  1852	07EF  BE 009Cr			     lea si, doi
+1  1853	07F2  9A 00000000se		     call far ptr strcat_proc
+   1854	07F7			     et_2_:
+   1855	07F7  E9 08AC			     jmp et
+   1856
+   1857				     ; Cifra 3
+   1858	07FA			     et_3:
+   1859					     ; Verificam daca trebuie sa stergem rezultatul
+   1860	07FA  80 3E 0135r 00		     cmp byte ptr [clear], 0
+   1861	07FF  74 08			     je	et_3c
+   1862					     ; Stergem rezultatul
+   1863	0801  C6 06 0135r 00		     mov byte ptr [clear], 0
+   1864	0806  EB 26 90			     jmp et_33c
+   1865	0809			     et_3c:
+   1866					     strlen rezultat, len
+1  1867	0809  BF 0062r			 lea di, rezultat
+1  1868	080C  9A 00000000se		     call strlen_proc
+1  1869	0811  A3 0090r			     mov [len],	ax
+   1870	0814  3D 0014			     cmp ax, max-1
+   1871	0817  7D 2D			     jge et_3_
+   1872					     strcmp rezultat, zero, zero_initial
+1  1873	0819  BE 0062r			 lea si, rezultat
+1  1874	081C  BF 0098r			     lea di, zero
+1  1875	081F  9A 00000000se		     call far ptr strcmp_proc
+1  1876	0824  A3 00B2r			     mov [zero_initial], ax
+   1877	0827  83 3E 00B2r 00		     cmp word ptr [zero_initial], 0
+   1878	082C  75 0D			     jne et_33_
+   1879	082E			     et_33c:
+   1880					     memset rezultat, 0, max+1
+1  1881	082E  B0 00			     mov al, 0
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 34
+calc.asm
+
+
+
+1  1882	0830  BF 0062r			     lea di, rezultat
+1  1883	0833  B9 0016			     mov cx, max+1
+1  1884	0836  9A 00000000se		     call far ptr memset_proc
+   1885	083B			     et_33_:
+   1886					     strcat rezultat, trei
+1  1887	083B  BF 0062r			 lea di, rezultat
+1  1888	083E  BE 009Er			     lea si, trei
+1  1889	0841  9A 00000000se		     call far ptr strcat_proc
+   1890	0846			     et_3_:
+   1891	0846  E9 085D			     jmp et
+   1892
+   1893				     ; Cifra 4
+   1894	0849			     et_4:
+   1895					     ; Verificam daca trebuie sa stergem rezultatul
+   1896	0849  80 3E 0135r 00		     cmp byte ptr [clear], 0
+   1897	084E  74 08			     je	et_4c
+   1898					     ; Stergem rezultatul
+   1899	0850  C6 06 0135r 00		     mov byte ptr [clear], 0
+   1900	0855  EB 26 90			     jmp et_44c
+   1901	0858			     et_4c:
+   1902					     strlen rezultat, len
+1  1903	0858  BF 0062r			 lea di, rezultat
+1  1904	085B  9A 00000000se		     call strlen_proc
+1  1905	0860  A3 0090r			     mov [len],	ax
+   1906	0863  3D 0014			     cmp ax, max-1
+   1907	0866  7D 2D			     jge et_4_
+   1908					     strcmp rezultat, zero, zero_initial
+1  1909	0868  BE 0062r			 lea si, rezultat
+1  1910	086B  BF 0098r			     lea di, zero
+1  1911	086E  9A 00000000se		     call far ptr strcmp_proc
+1  1912	0873  A3 00B2r			     mov [zero_initial], ax
+   1913	0876  83 3E 00B2r 00		     cmp word ptr [zero_initial], 0
+   1914	087B  75 0D			     jne et_44_
+   1915	087D			     et_44c:
+   1916					     memset rezultat, 0, max+1
+1  1917	087D  B0 00			     mov al, 0
+1  1918	087F  BF 0062r			     lea di, rezultat
+1  1919	0882  B9 0016			     mov cx, max+1
+1  1920	0885  9A 00000000se		     call far ptr memset_proc
+   1921	088A			     et_44_:
+   1922					     strcat rezultat, patru
+1  1923	088A  BF 0062r			 lea di, rezultat
+1  1924	088D  BE 00A0r			     lea si, patru
+1  1925	0890  9A 00000000se		     call far ptr strcat_proc
+   1926	0895			     et_4_:
+   1927	0895  E9 080E			     jmp et
+   1928
+   1929				     ; Cifra 5
+   1930	0898			     et_5:
+   1931					     ; Verificam daca trebuie sa stergem rezultatul
+   1932	0898  80 3E 0135r 00		     cmp byte ptr [clear], 0
+   1933	089D  74 08			     je	et_5c
+   1934					     ; Stergem rezultatul
+   1935	089F  C6 06 0135r 00		     mov byte ptr [clear], 0
+   1936	08A4  EB 26 90			     jmp et_55c
+   1937	08A7			     et_5c:
+   1938					     strlen rezultat, len
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 35
+calc.asm
+
+
+
+1  1939	08A7  BF 0062r			 lea di, rezultat
+1  1940	08AA  9A 00000000se		     call strlen_proc
+1  1941	08AF  A3 0090r			     mov [len],	ax
+   1942	08B2  3D 0014			     cmp ax, max-1
+   1943	08B5  7D 2D			     jge et_5_
+   1944					     strcmp rezultat, zero, zero_initial
+1  1945	08B7  BE 0062r			 lea si, rezultat
+1  1946	08BA  BF 0098r			     lea di, zero
+1  1947	08BD  9A 00000000se		     call far ptr strcmp_proc
+1  1948	08C2  A3 00B2r			     mov [zero_initial], ax
+   1949	08C5  83 3E 00B2r 00		     cmp word ptr [zero_initial], 0
+   1950	08CA  75 0D			     jne et_55_
+   1951	08CC			     et_55c:
+   1952					     memset rezultat, 0, max+1
+1  1953	08CC  B0 00			     mov al, 0
+1  1954	08CE  BF 0062r			     lea di, rezultat
+1  1955	08D1  B9 0016			     mov cx, max+1
+1  1956	08D4  9A 00000000se		     call far ptr memset_proc
+   1957	08D9			     et_55_:
+   1958					     strcat rezultat, cinci
+1  1959	08D9  BF 0062r			 lea di, rezultat
+1  1960	08DC  BE 00A2r			     lea si, cinci
+1  1961	08DF  9A 00000000se		     call far ptr strcat_proc
+   1962	08E4			     et_5_:
+   1963	08E4  E9 07BF			     jmp et
+   1964
+   1965				     ; Cifra 6
+   1966	08E7			     et_6:
+   1967					     ; Verificam daca trebuie sa stergem rezultatul
+   1968	08E7  80 3E 0135r 00		     cmp byte ptr [clear], 0
+   1969	08EC  74 08			     je	et_6c
+   1970					     ; Stergem rezultatul
+   1971	08EE  C6 06 0135r 00		     mov byte ptr [clear], 0
+   1972	08F3  EB 26 90			     jmp et_66c
+   1973	08F6			     et_6c:
+   1974					     strlen rezultat, len
+1  1975	08F6  BF 0062r			 lea di, rezultat
+1  1976	08F9  9A 00000000se		     call strlen_proc
+1  1977	08FE  A3 0090r			     mov [len],	ax
+   1978	0901  3D 0014			     cmp ax, max-1
+   1979	0904  7D 2D			     jge et_6_
+   1980					     strcmp rezultat, zero, zero_initial
+1  1981	0906  BE 0062r			 lea si, rezultat
+1  1982	0909  BF 0098r			     lea di, zero
+1  1983	090C  9A 00000000se		     call far ptr strcmp_proc
+1  1984	0911  A3 00B2r			     mov [zero_initial], ax
+   1985	0914  83 3E 00B2r 00		     cmp word ptr [zero_initial], 0
+   1986	0919  75 0D			     jne et_66_
+   1987	091B			     et_66c:
+   1988					     memset rezultat, 0, max+1
+1  1989	091B  B0 00			     mov al, 0
+1  1990	091D  BF 0062r			     lea di, rezultat
+1  1991	0920  B9 0016			     mov cx, max+1
+1  1992	0923  9A 00000000se		     call far ptr memset_proc
+   1993	0928			     et_66_:
+   1994					     strcat rezultat, sase
+1  1995	0928  BF 0062r			 lea di, rezultat
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 36
+calc.asm
+
+
+
+1  1996	092B  BE 00A4r			     lea si, sase
+1  1997	092E  9A 00000000se		     call far ptr strcat_proc
+   1998	0933			     et_6_:
+   1999	0933  E9 0770			     jmp et
+   2000
+   2001				     ; Cifra 7
+   2002	0936			     et_7:
+   2003					     ; Verificam daca trebuie sa stergem rezultatul
+   2004	0936  80 3E 0135r 00		     cmp byte ptr [clear], 0
+   2005	093B  74 08			     je	et_7c
+   2006					     ; Stergem rezultatul
+   2007	093D  C6 06 0135r 00		     mov byte ptr [clear], 0
+   2008	0942  EB 26 90			     jmp et_77c
+   2009	0945			     et_7c:
+   2010					     strlen rezultat, len
+1  2011	0945  BF 0062r			 lea di, rezultat
+1  2012	0948  9A 00000000se		     call strlen_proc
+1  2013	094D  A3 0090r			     mov [len],	ax
+   2014	0950  3D 0014			     cmp ax, max-1
+   2015	0953  7D 2D			     jge et_7_
+   2016					     strcmp rezultat, zero, zero_initial
+1  2017	0955  BE 0062r			 lea si, rezultat
+1  2018	0958  BF 0098r			     lea di, zero
+1  2019	095B  9A 00000000se		     call far ptr strcmp_proc
+1  2020	0960  A3 00B2r			     mov [zero_initial], ax
+   2021	0963  83 3E 00B2r 00		     cmp word ptr [zero_initial], 0
+   2022	0968  75 0D			     jne et_77_
+   2023	096A			     et_77c:
+   2024					     memset rezultat, 0, max+1
+1  2025	096A  B0 00			     mov al, 0
+1  2026	096C  BF 0062r			     lea di, rezultat
+1  2027	096F  B9 0016			     mov cx, max+1
+1  2028	0972  9A 00000000se		     call far ptr memset_proc
+   2029	0977			     et_77_:
+   2030					     strcat rezultat, sapte
+1  2031	0977  BF 0062r			 lea di, rezultat
+1  2032	097A  BE 00A6r			     lea si, sapte
+1  2033	097D  9A 00000000se		     call far ptr strcat_proc
+   2034	0982			     et_7_:
+   2035	0982  E9 0721			     jmp et
+   2036
+   2037				     ; Cifra 8
+   2038	0985			     et_8:
+   2039					     ; Verificam daca trebuie sa stergem rezultatul
+   2040	0985  80 3E 0135r 00		     cmp byte ptr [clear], 0
+   2041	098A  74 08			     je	et_8c
+   2042					     ; Stergem rezultatul
+   2043	098C  C6 06 0135r 00		     mov byte ptr [clear], 0
+   2044	0991  EB 26 90			     jmp et_88c
+   2045	0994			     et_8c:
+   2046					     strlen rezultat, len
+1  2047	0994  BF 0062r			 lea di, rezultat
+1  2048	0997  9A 00000000se		     call strlen_proc
+1  2049	099C  A3 0090r			     mov [len],	ax
+   2050	099F  3D 0014			     cmp ax, max-1
+   2051	09A2  7D 2D			     jge et_8_
+   2052					     strcmp rezultat, zero, zero_initial
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 37
+calc.asm
+
+
+
+1  2053	09A4  BE 0062r			 lea si, rezultat
+1  2054	09A7  BF 0098r			     lea di, zero
+1  2055	09AA  9A 00000000se		     call far ptr strcmp_proc
+1  2056	09AF  A3 00B2r			     mov [zero_initial], ax
+   2057	09B2  83 3E 00B2r 00		     cmp word ptr [zero_initial], 0
+   2058	09B7  75 0D			     jne et_88_
+   2059	09B9			     et_88c:
+   2060					     memset rezultat, 0, max+1
+1  2061	09B9  B0 00			     mov al, 0
+1  2062	09BB  BF 0062r			     lea di, rezultat
+1  2063	09BE  B9 0016			     mov cx, max+1
+1  2064	09C1  9A 00000000se		     call far ptr memset_proc
+   2065	09C6			     et_88_:
+   2066					     strcat rezultat, opt
+1  2067	09C6  BF 0062r			 lea di, rezultat
+1  2068	09C9  BE 00A8r			     lea si, opt
+1  2069	09CC  9A 00000000se		     call far ptr strcat_proc
+   2070	09D1			     et_8_:
+   2071	09D1  E9 06D2			     jmp et
+   2072
+   2073				     ; Cifra 9
+   2074	09D4			     et_9:
+   2075					     ; Verificam daca trebuie sa stergem rezultatul
+   2076	09D4  80 3E 0135r 00		     cmp byte ptr [clear], 0
+   2077	09D9  74 08			     je	et_9c
+   2078					     ; Stergem rezultatul
+   2079	09DB  C6 06 0135r 00		     mov byte ptr [clear], 0
+   2080	09E0  EB 26 90			     jmp et_99c
+   2081	09E3			     et_9c:
+   2082					     strlen rezultat, len
+1  2083	09E3  BF 0062r			 lea di, rezultat
+1  2084	09E6  9A 00000000se		     call strlen_proc
+1  2085	09EB  A3 0090r			     mov [len],	ax
+   2086	09EE  3D 0014			     cmp ax, max-1
+   2087	09F1  7D 2D			     jge et_9_
+   2088					     strcmp rezultat, zero, zero_initial
+1  2089	09F3  BE 0062r			 lea si, rezultat
+1  2090	09F6  BF 0098r			     lea di, zero
+1  2091	09F9  9A 00000000se		     call far ptr strcmp_proc
+1  2092	09FE  A3 00B2r			     mov [zero_initial], ax
+   2093	0A01  83 3E 00B2r 00		     cmp word ptr [zero_initial], 0
+   2094	0A06  75 0D			     jne et_99_
+   2095	0A08			     et_99c:
+   2096					     memset rezultat, 0, max+1
+1  2097	0A08  B0 00			     mov al, 0
+1  2098	0A0A  BF 0062r			     lea di, rezultat
+1  2099	0A0D  B9 0016			     mov cx, max+1
+1  2100	0A10  9A 00000000se		     call far ptr memset_proc
+   2101	0A15			     et_99_:
+   2102					     strcat rezultat, noua
+1  2103	0A15  BF 0062r			 lea di, rezultat
+1  2104	0A18  BE 00AAr			     lea si, noua
+1  2105	0A1B  9A 00000000se		     call far ptr strcat_proc
+   2106	0A20			     et_9_:
+   2107	0A20  E9 0683			     jmp et
+   2108
+   2109				     ; Separator virgula
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 38
+calc.asm
+
+
+
+   2110	0A23			     et_punct:
+   2111	0A23  80 3E 0135r 00		     cmp byte ptr [clear], 0
+   2112	0A28  74 2B			     je	et_pc
+   2113					     ; Stergem rezultatul
+   2114	0A2A  C6 06 0135r 00		     mov byte ptr [clear], 0
+   2115					     memset rezultat, 0, max+1
+1  2116	0A2F  B0 00			     mov al, 0
+1  2117	0A31  BF 0062r			     lea di, rezultat
+1  2118	0A34  B9 0016			     mov cx, max+1
+1  2119	0A37  9A 00000000se		     call far ptr memset_proc
+   2120					     strcat rezultat, zero_punct
+1  2121	0A3C  BF 0062r			 lea di, rezultat
+1  2122	0A3F  BE 0095r			     lea si, zero_punct
+1  2123	0A42  9A 00000000se		     call far ptr strcat_proc
+   2124					     strlen rezultat, len
+1  2125	0A47  BF 0062r			 lea di, rezultat
+1  2126	0A4A  9A 00000000se		     call strlen_proc
+1  2127	0A4F  A3 0090r			     mov [len],	ax
+   2128	0A52  E9 FC42			     jmp din_nou
+   2129	0A55			     et_pc:
+   2130					     strlen rezultat, len
+1  2131	0A55  BF 0062r			 lea di, rezultat
+1  2132	0A58  9A 00000000se		     call strlen_proc
+1  2133	0A5D  A3 0090r			     mov [len],	ax
+   2134	0A60  3D 0014			     cmp ax, max-1
+   2135	0A63  7D 1F			     jge et_p_
+   2136					     strchr rezultat, '.', are_punct
+1  2137	0A65  BE 0062r			     lea si, rezultat
+1  2138	0A68  B4 2E			     mov ah, '.'
+1  2139	0A6A  9A 00000000se		     call far ptr strchr_proc
+1  2140	0A6F  A2 00B0r			     mov [are_punct], al
+   2141	0A72  80 3E 00B0r 00		     cmp byte ptr [are_punct], 0 ; daca	avem un	. deja in 'rezultat'
+   2142	0A77  75 0B			     jne et_p_
+   2143					     strcat rezultat, punct
+1  2144	0A79  BF 0062r			 lea di, rezultat
+1  2145	0A7C  BE 00ACr			     lea si, punct
+1  2146	0A7F  9A 00000000se		     call far ptr strcat_proc
+   2147	0A84			     et_p_:
+   2148					     strlen rezultat, len
+1  2149	0A84  BF 0062r			 lea di, rezultat
+1  2150	0A87  9A 00000000se		     call strlen_proc
+1  2151	0A8C  A3 0090r			     mov [len],	ax
+   2152	0A8F  E9 FC05			     jmp din_nou
+   2153
+   2154				     ; Operatia	de schimbare de	semn
+   2155	0A92			     et_spacebar:
+   2156					     ; Verificam daca e	0
+   2157					     strcmp rezultat, zero, zero_initial
+1  2158	0A92  BE 0062r			 lea si, rezultat
+1  2159	0A95  BF 0098r			     lea di, zero
+1  2160	0A98  9A 00000000se		     call far ptr strcmp_proc
+1  2161	0A9D  A3 00B2r			     mov [zero_initial], ax
+   2162	0AA0  83 3E 00B2r 00		     cmp word ptr [zero_initial], 0
+   2163	0AA5  75 03			     jne continua
+   2164	0AA7  E9 05FC			     jmp et
+   2165	0AAA			     continua:
+   2166					     memset temp, 0, max+1
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 39
+calc.asm
+
+
+
+1  2167	0AAA  B0 00			     mov al, 0
+1  2168	0AAC  BF 0078r			     lea di, temp
+1  2169	0AAF  B9 0016			     mov cx, max+1
+1  2170	0AB2  9A 00000000se		     call far ptr memset_proc
+   2171					     strlen rezultat, len
+1  2172	0AB7  BF 0062r			 lea di, rezultat
+1  2173	0ABA  9A 00000000se		     call strlen_proc
+1  2174	0ABF  A3 0090r			     mov [len],	ax
+   2175	0AC2  3D 0015			     cmp ax, max
+   2176	0AC5  7D 6B			     jge et_sb0_
+   2177					     strchr rezultat, '-', are_minus
+1  2178	0AC7  BE 0062r			     lea si, rezultat
+1  2179	0ACA  B4 2D			     mov ah, '-'
+1  2180	0ACC  9A 00000000se		     call far ptr strchr_proc
+1  2181	0AD1  A2 00B1r			     mov [are_minus], al
+   2182	0AD4  80 3E 00B1r 00		     cmp byte ptr [are_minus], 0 ; daca	nu avem	- in 'rezultat'
+   2183	0AD9  75 31			     jne et_sb_
+   2184					     ; Punem minus in rezultat
+   2185					     strcat temp, minus
+1  2186	0ADB  BF 0078r			 lea di, temp
+1  2187	0ADE  BE 00AEr			     lea si, minus
+1  2188	0AE1  9A 00000000se		     call far ptr strcat_proc
+   2189					     strcat temp, rezultat
+1  2190	0AE6  BF 0078r			 lea di, temp
+1  2191	0AE9  BE 0062r			     lea si, rezultat
+1  2192	0AEC  9A 00000000se		     call far ptr strcat_proc
+   2193					     memset rezultat, 0, max+1
+1  2194	0AF1  B0 00			     mov al, 0
+1  2195	0AF3  BF 0062r			     lea di, rezultat
+1  2196	0AF6  B9 0016			     mov cx, max+1
+1  2197	0AF9  9A 00000000se		     call far ptr memset_proc
+   2198					     strcat rezultat, temp
+1  2199	0AFE  BF 0062r			 lea di, rezultat
+1  2200	0B01  BE 0078r			     lea si, temp
+1  2201	0B04  9A 00000000se		     call far ptr strcat_proc
+   2202	0B09  E9 059A			     jmp et
+   2203	0B0C			     et_sb_:
+   2204					     ; Scoatem minusul din rezultat
+   2205					     strcat temp, rezultat
+1  2206	0B0C  BF 0078r			 lea di, temp
+1  2207	0B0F  BE 0062r			     lea si, rezultat
+1  2208	0B12  9A 00000000se		     call far ptr strcat_proc
+   2209					     memset rezultat, 0, max+1
+1  2210	0B17  B0 00			     mov al, 0
+1  2211	0B19  BF 0062r			     lea di, rezultat
+1  2212	0B1C  B9 0016			     mov cx, max+1
+1  2213	0B1F  9A 00000000se		     call far ptr memset_proc
+   2214					     strpcat rezultat, temp, 1
+1  2215	0B24  BF 0062r			 lea di, rezultat
+1  2216	0B27  BE 0078r			     lea si, temp
+1  2217	0B2A  83 C6 01			     add si, 1
+1  2218	0B2D  9A 00000000se		     call far ptr strcat_proc
+   2219	0B32			     et_sb0_:
+   2220	0B32  E9 0571			     jmp et
+   2221
+   2222				     ; Operatii	matematice
+   2223	0B35			     et_plus:
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 40
+calc.asm
+
+
+
+   2224					     ; daca avem deja un operator il schimbam cu cel nou
+   2225	0B35  80 3E 0135r 01		     cmp byte ptr [clear], 1
+   2226	0B3A  75 08			     jne et_p0
+   2227	0B3C  C6 06 0130r 2B		     mov byte ptr [op],	'+'
+   2228	0B41  E9 0562			     jmp et
+   2229	0B44			     et_p0:
+   2230					     ; daca avem deja un operator de calculat il aplicam
+   2231	0B44  80 3E 0130r 00		     cmp byte ptr [op],	0
+   2232	0B49  74 15			     je	et_p
+   2233					     _atof rezultat, nr2
+1  2234	0B4B  56			     push si
+1  2235	0B4C  BE 0062r			     lea si, rezultat
+1  2236	0B4F  56			     push si
+1  2237	0B50  BE 012Cr			     lea si, nr2
+1  2238	0B53  56			     push si
+1  2239
+1  2240	0B54  9A 00000000se		     call far ptr atof_proc
+1  2241	0B59  83 C4 04			     add sp, 4
+1  2242	0B5C  5E			     pop si
+   2243	0B5D  E8 0554			     call calcul
+   2244	0B60			     et_p:
+   2245					 ; punem nr nostru in nr1
+   2246					     _atof rezultat, nr1
+1  2247	0B60  56			     push si
+1  2248	0B61  BE 0062r			     lea si, rezultat
+1  2249	0B64  56			     push si
+1  2250	0B65  BE 0128r			     lea si, nr1
+1  2251	0B68  56			     push si
+1  2252
+1  2253	0B69  9A 00000000se		     call far ptr atof_proc
+1  2254	0B6E  83 C4 04			     add sp, 4
+1  2255	0B71  5E			     pop si
+   2256					     ; setam operatorul
+   2257	0B72  C6 06 0130r 2B		     mov byte ptr [op],	'+'
+   2258	0B77  C6 06 0135r 01		     mov byte ptr [clear], 1
+   2259	0B7C  E9 0527			     jmp et
+   2260
+   2261	0B7F			     et_minus:
+   2262					     ; daca avem deja un operator il schimbam cu cel nou
+   2263	0B7F  80 3E 0135r 01		     cmp byte ptr [clear], 1
+   2264	0B84  75 08			     jne et_m0
+   2265	0B86  C6 06 0130r 2D		     mov byte ptr [op],	'-'
+   2266	0B8B  E9 0518			     jmp et
+   2267	0B8E			     et_m0:
+   2268					     ; daca avem deja un operator de calculat il aplicam
+   2269	0B8E  80 3E 0130r 00		     cmp byte ptr [op],	0
+   2270	0B93  74 15			     je	et_m
+   2271					     _atof rezultat, nr2
+1  2272	0B95  56			     push si
+1  2273	0B96  BE 0062r			     lea si, rezultat
+1  2274	0B99  56			     push si
+1  2275	0B9A  BE 012Cr			     lea si, nr2
+1  2276	0B9D  56			     push si
+1  2277
+1  2278	0B9E  9A 00000000se		     call far ptr atof_proc
+1  2279	0BA3  83 C4 04			     add sp, 4
+1  2280	0BA6  5E			     pop si
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 41
+calc.asm
+
+
+
+   2281	0BA7  E8 050A			     call calcul
+   2282	0BAA			     et_m:
+   2283					 ; punem nr nostru in nr1
+   2284					     _atof rezultat, nr1
+1  2285	0BAA  56			     push si
+1  2286	0BAB  BE 0062r			     lea si, rezultat
+1  2287	0BAE  56			     push si
+1  2288	0BAF  BE 0128r			     lea si, nr1
+1  2289	0BB2  56			     push si
+1  2290
+1  2291	0BB3  9A 00000000se		     call far ptr atof_proc
+1  2292	0BB8  83 C4 04			     add sp, 4
+1  2293	0BBB  5E			     pop si
+   2294					     ; setam operatorul
+   2295	0BBC  C6 06 0130r 2D		     mov byte ptr [op],	'-'
+   2296	0BC1  C6 06 0135r 01		     mov byte ptr [clear], 1
+   2297	0BC6  E9 04DD			     jmp et
+   2298
+   2299	0BC9			     et_inmultire:
+   2300					     ; daca avem deja un operator il schimbam cu cel nou
+   2301	0BC9  80 3E 0135r 01		     cmp byte ptr [clear], 1
+   2302	0BCE  75 08			     jne et_inm0
+   2303	0BD0  C6 06 0130r 2A		     mov byte ptr [op],	'*'
+   2304	0BD5  E9 04CE			     jmp et
+   2305	0BD8			     et_inm0:
+   2306					     ; daca avem deja un operator de calculat il aplicam
+   2307	0BD8  80 3E 0130r 00		     cmp byte ptr [op],	0
+   2308	0BDD  74 15			     je	et_inm
+   2309					     _atof rezultat, nr2
+1  2310	0BDF  56			     push si
+1  2311	0BE0  BE 0062r			     lea si, rezultat
+1  2312	0BE3  56			     push si
+1  2313	0BE4  BE 012Cr			     lea si, nr2
+1  2314	0BE7  56			     push si
+1  2315
+1  2316	0BE8  9A 00000000se		     call far ptr atof_proc
+1  2317	0BED  83 C4 04			     add sp, 4
+1  2318	0BF0  5E			     pop si
+   2319	0BF1  E8 04C0			     call calcul
+   2320	0BF4			     et_inm:
+   2321					 ; punem nr nostru in nr1
+   2322					     _atof rezultat, nr1
+1  2323	0BF4  56			     push si
+1  2324	0BF5  BE 0062r			     lea si, rezultat
+1  2325	0BF8  56			     push si
+1  2326	0BF9  BE 0128r			     lea si, nr1
+1  2327	0BFC  56			     push si
+1  2328
+1  2329	0BFD  9A 00000000se		     call far ptr atof_proc
+1  2330	0C02  83 C4 04			     add sp, 4
+1  2331	0C05  5E			     pop si
+   2332					     ; setam operatorul
+   2333	0C06  C6 06 0130r 2A		     mov byte ptr [op],	'*'
+   2334	0C0B  C6 06 0135r 01		     mov byte ptr [clear], 1
+   2335	0C10  E9 0493			     jmp et
+   2336
+   2337	0C13			     et_impartire:
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 42
+calc.asm
+
+
+
+   2338					     ; daca avem deja un operator il schimbam cu cel nou
+   2339	0C13  80 3E 0135r 01		     cmp byte ptr [clear], 1
+   2340	0C18  75 08			     jne et_imp0
+   2341	0C1A  C6 06 0130r 2F		     mov byte ptr [op],	'/'
+   2342	0C1F  E9 0484			     jmp et
+   2343	0C22			     et_imp0:
+   2344					     ; daca avem deja un operator de calculat il aplicam
+   2345	0C22  80 3E 0130r 00		     cmp byte ptr [op],	0
+   2346	0C27  74 15			     je	et_imp
+   2347					     _atof rezultat, nr2
+1  2348	0C29  56			     push si
+1  2349	0C2A  BE 0062r			     lea si, rezultat
+1  2350	0C2D  56			     push si
+1  2351	0C2E  BE 012Cr			     lea si, nr2
+1  2352	0C31  56			     push si
+1  2353
+1  2354	0C32  9A 00000000se		     call far ptr atof_proc
+1  2355	0C37  83 C4 04			     add sp, 4
+1  2356	0C3A  5E			     pop si
+   2357	0C3B  E8 0476			     call calcul
+   2358	0C3E			     et_imp:
+   2359					 ; punem nr nostru in nr1
+   2360					     _atof rezultat, nr1
+1  2361	0C3E  56			     push si
+1  2362	0C3F  BE 0062r			     lea si, rezultat
+1  2363	0C42  56			     push si
+1  2364	0C43  BE 0128r			     lea si, nr1
+1  2365	0C46  56			     push si
+1  2366
+1  2367	0C47  9A 00000000se		     call far ptr atof_proc
+1  2368	0C4C  83 C4 04			     add sp, 4
+1  2369	0C4F  5E			     pop si
+   2370					     ; setam operatorul
+   2371	0C50  C6 06 0130r 2F		     mov byte ptr [op],	'/'
+   2372	0C55  C6 06 0135r 01		     mov byte ptr [clear], 1
+   2373	0C5A  E9 0449			     jmp et
+   2374
+   2375				     ; Radacina	patrata
+   2376	0C5D			     et_r_mic:
+   2377	0C5D			     et_r_mare:
+   2378					     strchr rezultat, '-', are_minus
+1  2379	0C5D  BE 0062r			     lea si, rezultat
+1  2380	0C60  B4 2D			     mov ah, '-'
+1  2381	0C62  9A 00000000se		     call far ptr strchr_proc
+1  2382	0C67  A2 00B1r			     mov [are_minus], al
+   2383	0C6A  80 3E 00B1r 00		     cmp byte ptr [are_minus], 0 ; daca	nu avem	- in 'rezultat'
+   2384	0C6F  74 1B			     je	et_rr_
+   2385					     memset rezultat, 0, max+1
+1  2386	0C71  B0 00			     mov al, 0
+1  2387	0C73  BF 0062r			     lea di, rezultat
+1  2388	0C76  B9 0016			     mov cx, max+1
+1  2389	0C79  9A 00000000se		     call far ptr memset_proc
+   2390					     strcat rezultat, eroare_sqrt
+1  2391	0C7E  BF 0062r			 lea di, rezultat
+1  2392	0C81  BE 00BAr			     lea si, eroare_sqrt
+1  2393	0C84  9A 00000000se		     call far ptr strcat_proc
+   2394	0C89  E9 041A			     jmp et
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 43
+calc.asm
+
+
+
+   2395	0C8C			     et_rr_:
+   2396					     _atof rezultat, numar
+1  2397	0C8C  56			     push si
+1  2398	0C8D  BE 0062r			     lea si, rezultat
+1  2399	0C90  56			     push si
+1  2400	0C91  BE 00B6r			     lea si, numar
+1  2401	0C94  56			     push si
+1  2402
+1  2403	0C95  9A 00000000se		     call far ptr atof_proc
+1  2404	0C9A  83 C4 04			     add sp, 4
+1  2405	0C9D  5E			     pop si
+   2406	0C9E  D9 06 00B6r		     fld dword ptr [numar]
+   2407	0CA2  D9 FA			     fsqrt
+   2408	0CA4  D9 1E 00B6r		     fstp dword	ptr [numar]
+   2409					     memset rezultat, 0, max+1
+1  2410	0CA8  B0 00			     mov al, 0
+1  2411	0CAA  BF 0062r			     lea di, rezultat
+1  2412	0CAD  B9 0016			     mov cx, max+1
+1  2413	0CB0  9A 00000000se		     call far ptr memset_proc
+   2414					     _ftoa numar, rezultat
+1  2415
+1  2416	0CB5			     .data
+1  2417	013C  4EFFF13E			     ??001F  dd	2.147e09
+1  2418	0140  358637BD			     ??0020  dd	0.000001
+1  2419	0144  0000			     ??0021 dw 0
+1  2420	0146  ????????			     ??001E dd ?
+1  2421	014A			     .code
+1  2422					     ; incarcam	parametrii in stiva
+1  2423	0CB5  50			     push ax
+1  2424	0CB6  B8 0062r			     lea ax, rezultat
+1  2425	0CB9  50			     push ax
+1  2426	0CBA  A1 00B8r			     mov ax, word ptr numar + 2
+1  2427	0CBD  50			     push ax
+1  2428	0CBE  A1 00B6r			     mov ax, word ptr numar
+1  2429	0CC1  50			     push ax
+1  2430
+1  2431	0CC2  D9 06 00B6r		     fld dword ptr [numar]
+1  2432	0CC6  D9 E1			     fabs
+1  2433
+1  2434					     ; comparam	nr nostru in valoare absoluta cu maximul reprezentabil
+1  2435	0CC8  D8 16 013Cr		     fcom ??001F
+1  2436
+1  2437	0CCC  9B DD 3E 0144r		     fstsw ??0021
+1  2438	0CD1  9B			     fwait
+1  2439	0CD2  A1 0144r			     mov     ax, ??0021
+1  2440	0CD5  9E			     sahf
+1  2441	0CD6  77 1C			     ja	??0024
+1  2442
+1  2443					     ; comparam	nr nostru in valoare absoluta cu minimul reprezentabil
+1  2444	0CD8  D8 1E 0140r		     fcomp ??0020
+1  2445
+1  2446	0CDC  9B DD 3E 0144r		     fstsw ??0021
+1  2447	0CE1  9B			     fwait
+1  2448	0CE2  A1 0144r			     mov     ax, ??0021
+1  2449	0CE5  9E			     sahf
+1  2450	0CE6  72 0C			     jb	??0024
+1  2451
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 44
+calc.asm
+
+
+
+1  2452	0CE8			     ??0023:
+1  2453					     ; desc
+1  2454	0CE8  D9 1E 0146r		     fstp ??001E
+1  2455					     ; afisam nr in format normal
+1  2456	0CEC  9A 00000000se		     call far ptr ftoa_proc
+1  2457	0CF1  EB 0A 90			     jmp ??0022
+1  2458	0CF4			     ??0024:
+1  2459	0CF4  D9 1E 0146r		     fstp ??001E
+1  2460					     ; afisam nr in format stiintific
+1  2461	0CF8  9A 00000000se		     call far ptr ftoa_sc_proc
+1  2462	0CFD			     ??0022:
+1  2463	0CFD  83 C4 06			     add sp, 6
+1  2464	0D00  58			     pop ax
+   2465	0D01  E9 03A2			     jmp et
+   2466
+   2467				     ; numarul PI
+   2468	0D04			     et_p_mic:
+   2469	0D04			     et_p_mare:
+   2470	0D04  D9 EB			     fldpi
+   2471	0D06  D9 1E 00B6r		     fstp dword	ptr [numar]
+   2472					     memset rezultat, 0, max+1
+1  2473	0D0A  B0 00			     mov al, 0
+1  2474	0D0C  BF 0062r			     lea di, rezultat
+1  2475	0D0F  B9 0016			     mov cx, max+1
+1  2476	0D12  9A 00000000se		     call far ptr memset_proc
+   2477					     _ftoa numar, rezultat
+1  2478
+1  2479	0D17			     .data
+1  2480	014A  4EFFF13E			     ??0026  dd	2.147e09
+1  2481	014E  358637BD			     ??0027  dd	0.000001
+1  2482	0152  0000			     ??0028 dw 0
+1  2483	0154  ????????			     ??0025 dd ?
+1  2484	0158			     .code
+1  2485					     ; incarcam	parametrii in stiva
+1  2486	0D17  50			     push ax
+1  2487	0D18  B8 0062r			     lea ax, rezultat
+1  2488	0D1B  50			     push ax
+1  2489	0D1C  A1 00B8r			     mov ax, word ptr numar + 2
+1  2490	0D1F  50			     push ax
+1  2491	0D20  A1 00B6r			     mov ax, word ptr numar
+1  2492	0D23  50			     push ax
+1  2493
+1  2494	0D24  D9 06 00B6r		     fld dword ptr [numar]
+1  2495	0D28  D9 E1			     fabs
+1  2496
+1  2497					     ; comparam	nr nostru in valoare absoluta cu maximul reprezentabil
+1  2498	0D2A  D8 16 014Ar		     fcom ??0026
+1  2499
+1  2500	0D2E  9B DD 3E 0152r		     fstsw ??0028
+1  2501	0D33  9B			     fwait
+1  2502	0D34  A1 0152r			     mov     ax, ??0028
+1  2503	0D37  9E			     sahf
+1  2504	0D38  77 1C			     ja	??002B
+1  2505
+1  2506					     ; comparam	nr nostru in valoare absoluta cu minimul reprezentabil
+1  2507	0D3A  D8 1E 014Er		     fcomp ??0027
+1  2508
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 45
+calc.asm
+
+
+
+1  2509	0D3E  9B DD 3E 0152r		     fstsw ??0028
+1  2510	0D43  9B			     fwait
+1  2511	0D44  A1 0152r			     mov     ax, ??0028
+1  2512	0D47  9E			     sahf
+1  2513	0D48  72 0C			     jb	??002B
+1  2514
+1  2515	0D4A			     ??002A:
+1  2516					     ; desc
+1  2517	0D4A  D9 1E 0154r		     fstp ??0025
+1  2518					     ; afisam nr in format normal
+1  2519	0D4E  9A 00000000se		     call far ptr ftoa_proc
+1  2520	0D53  EB 0A 90			     jmp ??0029
+1  2521	0D56			     ??002B:
+1  2522	0D56  D9 1E 0154r		     fstp ??0025
+1  2523					     ; afisam nr in format stiintific
+1  2524	0D5A  9A 00000000se		     call far ptr ftoa_sc_proc
+1  2525	0D5F			     ??0029:
+1  2526	0D5F  83 C4 06			     add sp, 6
+1  2527	0D62  58			     pop ax
+   2528					     strdz rezultat
+1  2529	0D63			     .data
+1  2530	0158  00			     ??002F db 0
+1  2531	0159			     .code
+1  2532					     strchr rezultat, 'E', ??002F
+2  2533	0D63  BE 0062r			     lea si, rezultat
+2  2534	0D66  B4 45			     mov ah, 'E'
+2  2535	0D68  9A 00000000se		     call far ptr strchr_proc
+2  2536	0D6D  A2 0158r			     mov [??002F], al
+1  2537	0D70  80 3E 0158r 01		     cmp byte ptr [??002F], 1
+1  2538	0D75  74 2F			     je	??002C
+1  2539
+1  2540	0D77  BF 0062r			     lea di, rezultat
+1  2541	0D7A  9A 00000000se		     call far ptr strlen_proc
+1  2542					     ; Daca sirul are lungimea 0, terminam operatia
+1  2543	0D7F  3D 0000			     cmp ax, 0
+1  2544	0D82  74 22			     je	??002C
+1  2545
+1  2546					     ; Punem la	sfarsitul sirului 0
+1  2547	0D84  BE 0062r			     lea si, rezultat
+1  2548	0D87  03 F0			     add si, ax
+1  2549	0D89  4E			     dec si
+1  2550	0D8A			     ??002D:
+1  2551	0D8A  80 3C 2E			     cmp byte ptr [si],	'.'
+1  2552	0D8D  75 06			     jne ??002E
+1  2553	0D8F  C6 04 00			     mov byte ptr [si],	0
+1  2554	0D92  EB 12 90			     jmp ??002C
+1  2555	0D95			     ??002E:
+1  2556	0D95  80 3C 30			     cmp byte ptr [si],	'0'
+1  2557	0D98  75 0C			     jne ??002C
+1  2558	0D9A  3D 0001			     cmp ax, 1
+1  2559	0D9D  74 07			     je	??002C
+1  2560	0D9F  C6 04 00			     mov byte ptr [si],	0
+1  2561	0DA2  4E			     dec si
+1  2562	0DA3  48			     dec ax
+1  2563	0DA4  EB E4			     jmp ??002D
+1  2564	0DA6			     ??002C:
+   2565	0DA6  E9 02FD			     jmp et
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 46
+calc.asm
+
+
+
+   2566
+   2567				     ; 1/x
+   2568	0DA9			     et_i_mic:
+   2569	0DA9			     et_i_mare:
+   2570					     _atof rezultat, numar
+1  2571	0DA9  56			     push si
+1  2572	0DAA  BE 0062r			     lea si, rezultat
+1  2573	0DAD  56			     push si
+1  2574	0DAE  BE 00B6r			     lea si, numar
+1  2575	0DB1  56			     push si
+1  2576
+1  2577	0DB2  9A 00000000se		     call far ptr atof_proc
+1  2578	0DB7  83 C4 04			     add sp, 4
+1  2579	0DBA  5E			     pop si
+   2580	0DBB  D9 E8			     fld1
+   2581	0DBD  D9 06 00B6r		     fld dword ptr [numar]
+   2582	0DC1  DE F9			     fdivp st(1), st(0)
+   2583	0DC3  D9 1E 00B6r		     fstp dword	ptr [numar]
+   2584					     memset rezultat, 0, max+1
+1  2585	0DC7  B0 00			     mov al, 0
+1  2586	0DC9  BF 0062r			     lea di, rezultat
+1  2587	0DCC  B9 0016			     mov cx, max+1
+1  2588	0DCF  9A 00000000se		     call far ptr memset_proc
+   2589					     _ftoa numar, rezultat
+1  2590
+1  2591	0DD4			     .data
+1  2592	0159  4EFFF13E			     ??0031  dd	2.147e09
+1  2593	015D  358637BD			     ??0032  dd	0.000001
+1  2594	0161  0000			     ??0033 dw 0
+1  2595	0163  ????????			     ??0030 dd ?
+1  2596	0167			     .code
+1  2597					     ; incarcam	parametrii in stiva
+1  2598	0DD4  50			     push ax
+1  2599	0DD5  B8 0062r			     lea ax, rezultat
+1  2600	0DD8  50			     push ax
+1  2601	0DD9  A1 00B8r			     mov ax, word ptr numar + 2
+1  2602	0DDC  50			     push ax
+1  2603	0DDD  A1 00B6r			     mov ax, word ptr numar
+1  2604	0DE0  50			     push ax
+1  2605
+1  2606	0DE1  D9 06 00B6r		     fld dword ptr [numar]
+1  2607	0DE5  D9 E1			     fabs
+1  2608
+1  2609					     ; comparam	nr nostru in valoare absoluta cu maximul reprezentabil
+1  2610	0DE7  D8 16 0159r		     fcom ??0031
+1  2611
+1  2612	0DEB  9B DD 3E 0161r		     fstsw ??0033
+1  2613	0DF0  9B			     fwait
+1  2614	0DF1  A1 0161r			     mov     ax, ??0033
+1  2615	0DF4  9E			     sahf
+1  2616	0DF5  77 1C			     ja	??0036
+1  2617
+1  2618					     ; comparam	nr nostru in valoare absoluta cu minimul reprezentabil
+1  2619	0DF7  D8 1E 015Dr		     fcomp ??0032
+1  2620
+1  2621	0DFB  9B DD 3E 0161r		     fstsw ??0033
+1  2622	0E00  9B			     fwait
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 47
+calc.asm
+
+
+
+1  2623	0E01  A1 0161r			     mov     ax, ??0033
+1  2624	0E04  9E			     sahf
+1  2625	0E05  72 0C			     jb	??0036
+1  2626
+1  2627	0E07			     ??0035:
+1  2628					     ; desc
+1  2629	0E07  D9 1E 0163r		     fstp ??0030
+1  2630					     ; afisam nr in format normal
+1  2631	0E0B  9A 00000000se		     call far ptr ftoa_proc
+1  2632	0E10  EB 0A 90			     jmp ??0034
+1  2633	0E13			     ??0036:
+1  2634	0E13  D9 1E 0163r		     fstp ??0030
+1  2635					     ; afisam nr in format stiintific
+1  2636	0E17  9A 00000000se		     call far ptr ftoa_sc_proc
+1  2637	0E1C			     ??0034:
+1  2638	0E1C  83 C4 06			     add sp, 6
+1  2639	0E1F  58			     pop ax
+   2640					     strdz rezultat
+1  2641	0E20			     .data
+1  2642	0167  00			     ??003A db 0
+1  2643	0168			     .code
+1  2644					     strchr rezultat, 'E', ??003A
+2  2645	0E20  BE 0062r			     lea si, rezultat
+2  2646	0E23  B4 45			     mov ah, 'E'
+2  2647	0E25  9A 00000000se		     call far ptr strchr_proc
+2  2648	0E2A  A2 0167r			     mov [??003A], al
+1  2649	0E2D  80 3E 0167r 01		     cmp byte ptr [??003A], 1
+1  2650	0E32  74 2F			     je	??0037
+1  2651
+1  2652	0E34  BF 0062r			     lea di, rezultat
+1  2653	0E37  9A 00000000se		     call far ptr strlen_proc
+1  2654					     ; Daca sirul are lungimea 0, terminam operatia
+1  2655	0E3C  3D 0000			     cmp ax, 0
+1  2656	0E3F  74 22			     je	??0037
+1  2657
+1  2658					     ; Punem la	sfarsitul sirului 0
+1  2659	0E41  BE 0062r			     lea si, rezultat
+1  2660	0E44  03 F0			     add si, ax
+1  2661	0E46  4E			     dec si
+1  2662	0E47			     ??0038:
+1  2663	0E47  80 3C 2E			     cmp byte ptr [si],	'.'
+1  2664	0E4A  75 06			     jne ??0039
+1  2665	0E4C  C6 04 00			     mov byte ptr [si],	0
+1  2666	0E4F  EB 12 90			     jmp ??0037
+1  2667	0E52			     ??0039:
+1  2668	0E52  80 3C 30			     cmp byte ptr [si],	'0'
+1  2669	0E55  75 0C			     jne ??0037
+1  2670	0E57  3D 0001			     cmp ax, 1
+1  2671	0E5A  74 07			     je	??0037
+1  2672	0E5C  C6 04 00			     mov byte ptr [si],	0
+1  2673	0E5F  4E			     dec si
+1  2674	0E60  48			     dec ax
+1  2675	0E61  EB E4			     jmp ??0038
+1  2676	0E63			     ??0037:
+   2677	0E63  E9 0240			     jmp et
+   2678
+   2679				     ; x^2
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 48
+calc.asm
+
+
+
+   2680	0E66			     et_s_mic:
+   2681	0E66			     et_s_mare:
+   2682					     _atof rezultat, numar
+1  2683	0E66  56			     push si
+1  2684	0E67  BE 0062r			     lea si, rezultat
+1  2685	0E6A  56			     push si
+1  2686	0E6B  BE 00B6r			     lea si, numar
+1  2687	0E6E  56			     push si
+1  2688
+1  2689	0E6F  9A 00000000se		     call far ptr atof_proc
+1  2690	0E74  83 C4 04			     add sp, 4
+1  2691	0E77  5E			     pop si
+   2692	0E78  D9 06 00B6r		     fld dword ptr [numar]
+   2693	0E7C  D8 C8			     fmul st(0), st(0)
+   2694	0E7E  D9 1E 00B6r		     fstp dword	ptr [numar]
+   2695					     memset rezultat, 0, max+1
+1  2696	0E82  B0 00			     mov al, 0
+1  2697	0E84  BF 0062r			     lea di, rezultat
+1  2698	0E87  B9 0016			     mov cx, max+1
+1  2699	0E8A  9A 00000000se		     call far ptr memset_proc
+   2700					     _ftoa numar, rezultat
+1  2701
+1  2702	0E8F			     .data
+1  2703	0168  4EFFF13E			     ??003C  dd	2.147e09
+1  2704	016C  358637BD			     ??003D  dd	0.000001
+1  2705	0170  0000			     ??003E dw 0
+1  2706	0172  ????????			     ??003B dd ?
+1  2707	0176			     .code
+1  2708					     ; incarcam	parametrii in stiva
+1  2709	0E8F  50			     push ax
+1  2710	0E90  B8 0062r			     lea ax, rezultat
+1  2711	0E93  50			     push ax
+1  2712	0E94  A1 00B8r			     mov ax, word ptr numar + 2
+1  2713	0E97  50			     push ax
+1  2714	0E98  A1 00B6r			     mov ax, word ptr numar
+1  2715	0E9B  50			     push ax
+1  2716
+1  2717	0E9C  D9 06 00B6r		     fld dword ptr [numar]
+1  2718	0EA0  D9 E1			     fabs
+1  2719
+1  2720					     ; comparam	nr nostru in valoare absoluta cu maximul reprezentabil
+1  2721	0EA2  D8 16 0168r		     fcom ??003C
+1  2722
+1  2723	0EA6  9B DD 3E 0170r		     fstsw ??003E
+1  2724	0EAB  9B			     fwait
+1  2725	0EAC  A1 0170r			     mov     ax, ??003E
+1  2726	0EAF  9E			     sahf
+1  2727	0EB0  77 1C			     ja	??0041
+1  2728
+1  2729					     ; comparam	nr nostru in valoare absoluta cu minimul reprezentabil
+1  2730	0EB2  D8 1E 016Cr		     fcomp ??003D
+1  2731
+1  2732	0EB6  9B DD 3E 0170r		     fstsw ??003E
+1  2733	0EBB  9B			     fwait
+1  2734	0EBC  A1 0170r			     mov     ax, ??003E
+1  2735	0EBF  9E			     sahf
+1  2736	0EC0  72 0C			     jb	??0041
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 49
+calc.asm
+
+
+
+1  2737
+1  2738	0EC2			     ??0040:
+1  2739					     ; desc
+1  2740	0EC2  D9 1E 0172r		     fstp ??003B
+1  2741					     ; afisam nr in format normal
+1  2742	0EC6  9A 00000000se		     call far ptr ftoa_proc
+1  2743	0ECB  EB 0A 90			     jmp ??003F
+1  2744	0ECE			     ??0041:
+1  2745	0ECE  D9 1E 0172r		     fstp ??003B
+1  2746					     ; afisam nr in format stiintific
+1  2747	0ED2  9A 00000000se		     call far ptr ftoa_sc_proc
+1  2748	0ED7			     ??003F:
+1  2749	0ED7  83 C4 06			     add sp, 6
+1  2750	0EDA  58			     pop ax
+   2751					     strdz rezultat
+1  2752	0EDB			     .data
+1  2753	0176  00			     ??0045 db 0
+1  2754	0177			     .code
+1  2755					     strchr rezultat, 'E', ??0045
+2  2756	0EDB  BE 0062r			     lea si, rezultat
+2  2757	0EDE  B4 45			     mov ah, 'E'
+2  2758	0EE0  9A 00000000se		     call far ptr strchr_proc
+2  2759	0EE5  A2 0176r			     mov [??0045], al
+1  2760	0EE8  80 3E 0176r 01		     cmp byte ptr [??0045], 1
+1  2761	0EED  74 2F			     je	??0042
+1  2762
+1  2763	0EEF  BF 0062r			     lea di, rezultat
+1  2764	0EF2  9A 00000000se		     call far ptr strlen_proc
+1  2765					     ; Daca sirul are lungimea 0, terminam operatia
+1  2766	0EF7  3D 0000			     cmp ax, 0
+1  2767	0EFA  74 22			     je	??0042
+1  2768
+1  2769					     ; Punem la	sfarsitul sirului 0
+1  2770	0EFC  BE 0062r			     lea si, rezultat
+1  2771	0EFF  03 F0			     add si, ax
+1  2772	0F01  4E			     dec si
+1  2773	0F02			     ??0043:
+1  2774	0F02  80 3C 2E			     cmp byte ptr [si],	'.'
+1  2775	0F05  75 06			     jne ??0044
+1  2776	0F07  C6 04 00			     mov byte ptr [si],	0
+1  2777	0F0A  EB 12 90			     jmp ??0042
+1  2778	0F0D			     ??0044:
+1  2779	0F0D  80 3C 30			     cmp byte ptr [si],	'0'
+1  2780	0F10  75 0C			     jne ??0042
+1  2781	0F12  3D 0001			     cmp ax, 1
+1  2782	0F15  74 07			     je	??0042
+1  2783	0F17  C6 04 00			     mov byte ptr [si],	0
+1  2784	0F1A  4E			     dec si
+1  2785	0F1B  48			     dec ax
+1  2786	0F1C  EB E4			     jmp ??0043
+1  2787	0F1E			     ??0042:
+   2788	0F1E  E9 0185			     jmp et
+   2789
+   2790				     ; x^3
+   2791	0F21			     et_b_mic:
+   2792	0F21			     et_b_mare:
+   2793					     _atof rezultat, numar
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 50
+calc.asm
+
+
+
+1  2794	0F21  56			     push si
+1  2795	0F22  BE 0062r			     lea si, rezultat
+1  2796	0F25  56			     push si
+1  2797	0F26  BE 00B6r			     lea si, numar
+1  2798	0F29  56			     push si
+1  2799
+1  2800	0F2A  9A 00000000se		     call far ptr atof_proc
+1  2801	0F2F  83 C4 04			     add sp, 4
+1  2802	0F32  5E			     pop si
+   2803	0F33  D9 06 00B6r		     fld dword ptr [numar]
+   2804	0F37  D8 C8			     fmul st(0), st(0)
+   2805	0F39  D9 06 00B6r		     fld dword ptr [numar]
+   2806	0F3D  DE C9			     fmulp st(1), st(0)
+   2807	0F3F  D9 1E 00B6r		     fstp dword	ptr [numar]
+   2808					     memset rezultat, 0, max+1
+1  2809	0F43  B0 00			     mov al, 0
+1  2810	0F45  BF 0062r			     lea di, rezultat
+1  2811	0F48  B9 0016			     mov cx, max+1
+1  2812	0F4B  9A 00000000se		     call far ptr memset_proc
+   2813					     _ftoa numar, rezultat
+1  2814
+1  2815	0F50			     .data
+1  2816	0177  4EFFF13E			     ??0047  dd	2.147e09
+1  2817	017B  358637BD			     ??0048  dd	0.000001
+1  2818	017F  0000			     ??0049 dw 0
+1  2819	0181  ????????			     ??0046 dd ?
+1  2820	0185			     .code
+1  2821					     ; incarcam	parametrii in stiva
+1  2822	0F50  50			     push ax
+1  2823	0F51  B8 0062r			     lea ax, rezultat
+1  2824	0F54  50			     push ax
+1  2825	0F55  A1 00B8r			     mov ax, word ptr numar + 2
+1  2826	0F58  50			     push ax
+1  2827	0F59  A1 00B6r			     mov ax, word ptr numar
+1  2828	0F5C  50			     push ax
+1  2829
+1  2830	0F5D  D9 06 00B6r		     fld dword ptr [numar]
+1  2831	0F61  D9 E1			     fabs
+1  2832
+1  2833					     ; comparam	nr nostru in valoare absoluta cu maximul reprezentabil
+1  2834	0F63  D8 16 0177r		     fcom ??0047
+1  2835
+1  2836	0F67  9B DD 3E 017Fr		     fstsw ??0049
+1  2837	0F6C  9B			     fwait
+1  2838	0F6D  A1 017Fr			     mov     ax, ??0049
+1  2839	0F70  9E			     sahf
+1  2840	0F71  77 1C			     ja	??004C
+1  2841
+1  2842					     ; comparam	nr nostru in valoare absoluta cu minimul reprezentabil
+1  2843	0F73  D8 1E 017Br		     fcomp ??0048
+1  2844
+1  2845	0F77  9B DD 3E 017Fr		     fstsw ??0049
+1  2846	0F7C  9B			     fwait
+1  2847	0F7D  A1 017Fr			     mov     ax, ??0049
+1  2848	0F80  9E			     sahf
+1  2849	0F81  72 0C			     jb	??004C
+1  2850
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 51
+calc.asm
+
+
+
+1  2851	0F83			     ??004B:
+1  2852					     ; desc
+1  2853	0F83  D9 1E 0181r		     fstp ??0046
+1  2854					     ; afisam nr in format normal
+1  2855	0F87  9A 00000000se		     call far ptr ftoa_proc
+1  2856	0F8C  EB 0A 90			     jmp ??004A
+1  2857	0F8F			     ??004C:
+1  2858	0F8F  D9 1E 0181r		     fstp ??0046
+1  2859					     ; afisam nr in format stiintific
+1  2860	0F93  9A 00000000se		     call far ptr ftoa_sc_proc
+1  2861	0F98			     ??004A:
+1  2862	0F98  83 C4 06			     add sp, 6
+1  2863	0F9B  58			     pop ax
+   2864					     strdz rezultat
+1  2865	0F9C			     .data
+1  2866	0185  00			     ??0050 db 0
+1  2867	0186			     .code
+1  2868					     strchr rezultat, 'E', ??0050
+2  2869	0F9C  BE 0062r			     lea si, rezultat
+2  2870	0F9F  B4 45			     mov ah, 'E'
+2  2871	0FA1  9A 00000000se		     call far ptr strchr_proc
+2  2872	0FA6  A2 0185r			     mov [??0050], al
+1  2873	0FA9  80 3E 0185r 01		     cmp byte ptr [??0050], 1
+1  2874	0FAE  74 2F			     je	??004D
+1  2875
+1  2876	0FB0  BF 0062r			     lea di, rezultat
+1  2877	0FB3  9A 00000000se		     call far ptr strlen_proc
+1  2878					     ; Daca sirul are lungimea 0, terminam operatia
+1  2879	0FB8  3D 0000			     cmp ax, 0
+1  2880	0FBB  74 22			     je	??004D
+1  2881
+1  2882					     ; Punem la	sfarsitul sirului 0
+1  2883	0FBD  BE 0062r			     lea si, rezultat
+1  2884	0FC0  03 F0			     add si, ax
+1  2885	0FC2  4E			     dec si
+1  2886	0FC3			     ??004E:
+1  2887	0FC3  80 3C 2E			     cmp byte ptr [si],	'.'
+1  2888	0FC6  75 06			     jne ??004F
+1  2889	0FC8  C6 04 00			     mov byte ptr [si],	0
+1  2890	0FCB  EB 12 90			     jmp ??004D
+1  2891	0FCE			     ??004F:
+1  2892	0FCE  80 3C 30			     cmp byte ptr [si],	'0'
+1  2893	0FD1  75 0C			     jne ??004D
+1  2894	0FD3  3D 0001			     cmp ax, 1
+1  2895	0FD6  74 07			     je	??004D
+1  2896	0FD8  C6 04 00			     mov byte ptr [si],	0
+1  2897	0FDB  4E			     dec si
+1  2898	0FDC  48			     dec ax
+1  2899	0FDD  EB E4			     jmp ??004E
+1  2900	0FDF			     ??004D:
+   2901	0FDF  E9 00C4			     jmp et
+   2902
+   2903	0FE2			     et_egal:
+   2904	0FE2			     et_enter:
+   2905					     ; daca avem un operator afisam rezultatul calculului
+   2906	0FE2  80 3E 0130r 00		     cmp byte ptr [op],	0
+   2907	0FE7  74 15			     je	et_rez
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 52
+calc.asm
+
+
+
+   2908					     _atof rezultat, nr2
+1  2909	0FE9  56			     push si
+1  2910	0FEA  BE 0062r			     lea si, rezultat
+1  2911	0FED  56			     push si
+1  2912	0FEE  BE 012Cr			     lea si, nr2
+1  2913	0FF1  56			     push si
+1  2914
+1  2915	0FF2  9A 00000000se		     call far ptr atof_proc
+1  2916	0FF7  83 C4 04			     add sp, 4
+1  2917	0FFA  5E			     pop si
+   2918	0FFB  E8 00B6			     call calcul
+   2919	0FFE			     et_rez:
+   2920	0FFE  E9 00A5			     jmp et
+   2921
+   2922				     ; Operatia	de stergere cifra
+   2923	1001			     et_backspace:
+   2924					     ; stergem ultimul caracter
+   2925					     strdlc rezultat
+1  2926
+1  2927	1001  BF 0062r			     lea di, rezultat
+1  2928	1004  9A 00000000se		     call far ptr strlen_proc
+1  2929					     ; Daca sirul are lungimea 0, terminam operatia
+1  2930	1009  3D 0000			     cmp ax, 0
+1  2931	100C  74 09			     je	??0051
+1  2932
+1  2933					     ; Punem la	sfarsitul sirului 0
+1  2934	100E  BE 0062r			     lea si, rezultat
+1  2935	1011  03 F0			     add si, ax
+1  2936	1013  4E			     dec si
+1  2937	1014  C6 04 00			     mov byte ptr [si],	0
+1  2938	1017			     ??0051:
+   2939					     strlen rezultat, len
+1  2940	1017  BF 0062r			 lea di, rezultat
+1  2941	101A  9A 00000000se		     call strlen_proc
+1  2942	101F  A3 0090r			     mov [len],	ax
+   2943
+   2944					     ; Daca nu mai avem	nici un	caracter, punem	0
+   2945	1022  83 3E 0090r 00		     cmp word ptr [len], 0
+   2946	1027  7F 03			     jg	et_b1
+   2947	1029  EB 38 90			     jmp et_b4
+   2948	102C			     et_b1:
+   2949					     ; daca rezultat = - transformam in	0
+   2950					     strcmp rezultat, minus, e_minus_zero
+1  2951	102C  BE 0062r			 lea si, rezultat
+1  2952	102F  BF 00AEr			     lea di, minus
+1  2953	1032  9A 00000000se		     call far ptr strcmp_proc
+1  2954	1037  A3 00B4r			     mov [e_minus_zero], ax
+   2955	103A  83 3E 00B4r 00		     cmp word ptr [e_minus_zero], 0
+   2956	103F  74 15			     je	et_b3
+   2957	1041			     et_b2:
+   2958					 ; daca	rezultat = -0 transformam in 0
+   2959					     strcmp rezultat, minus_zero, e_minus_zero
+1  2960	1041  BE 0062r			 lea si, rezultat
+1  2961	1044  BF 0092r			     lea di, minus_zero
+1  2962	1047  9A 00000000se		     call far ptr strcmp_proc
+1  2963	104C  A3 00B4r			     mov [e_minus_zero], ax
+   2964	104F  83 3E 00B4r 00		     cmp word ptr [e_minus_zero], 0
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 53
+calc.asm
+
+
+
+   2965	1054  75 18			     jne et_b
+   2966	1056			     et_b3:
+   2967					     memset rezultat, 0, max+1
+1  2968	1056  B0 00			     mov al, 0
+1  2969	1058  BF 0062r			     lea di, rezultat
+1  2970	105B  B9 0016			     mov cx, max+1
+1  2971	105E  9A 00000000se		     call far ptr memset_proc
+   2972	1063			     et_b4:
+   2973					     strcat rezultat, zero
+1  2974	1063  BF 0062r			 lea di, rezultat
+1  2975	1066  BE 0098r			     lea si, zero
+1  2976	1069  9A 00000000se		     call far ptr strcat_proc
+   2977	106E			     et_b:
+   2978	106E  EB 36 90			     jmp et
+   2979
+   2980				     ; Anuleaza	rezultat + alte	flag-uri
+   2981	1071			     et_c_mic:
+   2982	1071			     et_c_mare:
+   2983	1071  C6 06 0135r 00		     mov byte ptr [clear], 0
+   2984	1076  C6 06 0130r 00		     mov byte ptr [op],	0
+   2985	107B  C7 06 00B4r 0000		     mov word ptr [e_minus_zero], 0
+   2986	1081  C6 06 00B1r 00		     mov byte ptr [are_minus], 0
+   2987	1086  C6 06 00B0r 00		     mov byte ptr [are_punct], 0
+   2988					     memset rezultat, 0, max+1
+1  2989	108B  B0 00			     mov al, 0
+1  2990	108D  BF 0062r			     lea di, rezultat
+1  2991	1090  B9 0016			     mov cx, max+1
+1  2992	1093  9A 00000000se		     call far ptr memset_proc
+   2993					     strcat rezultat, zero
+1  2994	1098  BF 0062r			 lea di, rezultat
+1  2995	109B  BE 0098r			     lea si, zero
+1  2996	109E  9A 00000000se		     call far ptr strcat_proc
+   2997	10A3  EB 01 90			     jmp et
+   2998
+   2999	10A6			     et:
+   3000					     strlen rezultat, len
+1  3001	10A6  BF 0062r			 lea di, rezultat
+1  3002	10A9  9A 00000000se		     call strlen_proc
+1  3003	10AE  A3 0090r			     mov [len],	ax
+   3004	10B1  E9 F5E3			     jmp din_nou
+   3005
+   3006				     ; calculul	propriu-zis al operatiilor
+   3007	10B4			     calcul:
+   3008	10B4  80 3E 0130r 2B		     cmp byte ptr [op],	'+'
+   3009	10B9  75 0B			     jne op_minus
+   3010					     ; Operatia	de adunare
+   3011	10BB  D9 06 0128r		     fld dword ptr [nr1] ; st0 = nr1
+   3012	10BF  D8 06 012Cr		     fadd nr2 ;	st0 = st0 + nr2
+   3013					     ;fadd round
+   3014	10C3  EB 37 90			     jmp op_final
+   3015	10C6			     op_minus:
+   3016	10C6  80 3E 0130r 2D		     cmp byte ptr [op],	'-'
+   3017	10CB  75 0B			     jne op_inmultire
+   3018					     ; Operatia	de scadere
+   3019	10CD  D9 06 0128r		     fld dword ptr [nr1] ; st0 = nr1
+   3020	10D1  D8 26 012Cr		     fsub nr2 ;	st0 = st0 - nr2
+   3021					     ;fadd round
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 54
+calc.asm
+
+
+
+   3022	10D5  EB 25 90			     jmp op_final
+   3023	10D8			     op_inmultire:
+   3024	10D8  80 3E 0130r 2A		     cmp byte ptr [op],	'*'
+   3025	10DD  75 0B			     jne op_impartire
+   3026					     ; Operatia	de inmultire
+   3027	10DF  D9 06 0128r		     fld dword ptr [nr1] ; st0 = nr1
+   3028	10E3  D8 0E 012Cr		     fmul nr2 ;	st0 = st0 * nr2
+   3029					     ;fadd round
+   3030	10E7  EB 13 90			     jmp op_final
+   3031	10EA			     op_impartire:
+   3032	10EA  80 3E 0130r 2F		     cmp byte ptr [op],	'/'
+   3033	10EF  74 03			     je	op_imp
+   3034	10F1  E9 013F			     jmp op_gata
+   3035	10F4			     op_imp:
+   3036					     ; Operatia	de impartire
+   3037	10F4  D9 06 0128r		     fld dword ptr [nr1] ; st0 = nr1
+   3038	10F8  D8 36 012Cr		     fdiv nr2 ;	st0 = st0 / nr2
+   3039					     ;fadd round
+   3040	10FC			     op_final:
+   3041					     memset rezultat, 0, max+1
+1  3042	10FC  B0 00			     mov al, 0
+1  3043	10FE  BF 0062r			     lea di, rezultat
+1  3044	1101  B9 0016			     mov cx, max+1
+1  3045	1104  9A 00000000se		     call far ptr memset_proc
+   3046
+   3047	1109  D9 E5			     fxam	    ;examine it
+   3048	110B  9B DF E0			 fstsw ax	;copy the content of the Status	Word to	AX
+   3049	110E  9B			 fwait		;insure	the last instruction is	completed
+   3050	110F  9E			 sahf		;copy the C3/C2/C0 condition codes to the ZF/PF/CF flags
+   3051	1110  74 43			 jz    C3is1	;either	Zero, Empty or Denormalized if C3=1
+   3052	1112  7A 13			 jpe   C2is1	;either	normal or infinity if C3=0 and C2=1
+   3053	1114  72 03			 jc    isNAN	;would be NAN if C3=0, C2=0 and	C0=1
+   3054							;code for the case of Unsupported, no need to check sign
+   3055	1116  EB 73 90			     jmp op_final_
+   3056	1119			     isNAN:
+   3057					 strcat	rezultat, eroare_nan	 ;code for the case of a NAN, no need to check the sign
+1  3058	1119  BF 0062r			 lea di, rezultat
+1  3059	111C  BE 00DDr			     lea si, eroare_nan
+1  3060	111F  9A 00000000se		     call far ptr strcat_proc
+   3061	1124  E9 00F7			     jmp op_afisare
+   3062
+   3063	1127			     C2is1:
+   3064	1127  72 0B			 jc    isINFINITY ;would be Infinity if	C3=0, C2=1 and C0=1
+   3065							  ;this	leaves the case	for a Normal finite number
+   3066	1129  F6 C4 02			 test  ah,2	  ;test	for the	sign which is in bit1 of AH
+   3067	112C  75 03			 jnz   negNORMAL
+   3068	112E  EB 5B 90			 jmp op_final_	   ;code for the case of a positive Normal finite number
+   3069
+   3070	1131			     negNORMAL:
+   3071	1131  EB 58 90			 jmp op_final_	   ;code for the case of a negative Normal finite number
+   3072
+   3073	1134			     isINFINITY:
+   3074	1134  F6 C4 02			 test  ah,2	;test for the sign which is in bit1 of AH
+   3075	1137  75 0E			 jnz   negINFINITY
+   3076					 strcat	rezultat, eroare_pinf
+1  3077	1139  BF 0062r			 lea di, rezultat
+1  3078	113C  BE 00EEr			     lea si, eroare_pinf
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 55
+calc.asm
+
+
+
+1  3079	113F  9A 00000000se		     call far ptr strcat_proc
+   3080	1144  E9 00D7			 jmp op_afisare	    ;code for the case of a positive Infinity
+   3081
+   3082	1147			     negINFINITY:
+   3083					     strcat rezultat, eroare_minf
+1  3084	1147  BF 0062r			 lea di, rezultat
+1  3085	114A  BE 00F7r			     lea si, eroare_minf
+1  3086	114D  9A 00000000se		     call far ptr strcat_proc
+   3087	1152  E9 00C9			 jmp op_afisare	    ;code for the case of a negative Infinity
+   3088
+   3089	1155			     C3is1:
+   3090	1155  72 05			 jc  isEMPTY  ;would be	Empty if C3=1 and C0=1
+   3091	1157  7A 11			 jpe isDENORMAL	;would be a Denormalized number	if C3=1, C0=0 and C2=1
+   3092						       ;this leaves the	case for a Zero	value
+   3093	1159  EB 30 90			 jmp op_final_	   ;code for the case of a Zero	value, no need to check	sign
+   3094
+   3095	115C			     isEMPTY:
+   3096					     strcat rezultat, eroare_gol
+1  3097	115C  BF 0062r			 lea di, rezultat
+1  3098	115F  BE 0100r			     lea si, eroare_gol
+1  3099	1162  9A 00000000se		     call far ptr strcat_proc
+   3100	1167  E9 00B4			 jmp op_afisare	    ;code for the case of an Empty register
+   3101						       ;which does not apply in	this example because
+   3102						       ;ST(0) was loaded with a	value from memory
+   3103
+   3104	116A			     isDENORMAL:
+   3105	116A  F6 C4 02			 test ah,2     ;test for the sign which	is in bit1 of AH
+   3106	116D  75 0E			 jnz negDENORMAL
+   3107					     strcat rezultat, eroare_dp
+1  3108	116F  BF 0062r			 lea di, rezultat
+1  3109	1172  BE 010Ar			     lea si, eroare_dp
+1  3110	1175  9A 00000000se		     call far ptr strcat_proc
+   3111	117A  E9 00A1			 jmp op_afisare	   ;code for the case of a positive Denormalized number
+   3112
+   3113	117D			     negDENORMAL:
+   3114					     strcat rezultat, eroare_dn
+1  3115	117D  BF 0062r			 lea di, rezultat
+1  3116	1180  BE 0119r			     lea si, eroare_dn
+1  3117	1183  9A 00000000se		     call far ptr strcat_proc
+   3118	1188  E9 0093			     jmp op_afisare
+   3119
+   3120	118B			     op_final_:
+   3121	118B  D9 1E 00B6r		     fstp dword	ptr [numar]
+   3122					     _ftoa numar, rezultat
+1  3123
+1  3124	118F			     .data
+1  3125	0186  4EFFF13E			     ??0053  dd	2.147e09
+1  3126	018A  358637BD			     ??0054  dd	0.000001
+1  3127	018E  0000			     ??0055 dw 0
+1  3128	0190  ????????			     ??0052 dd ?
+1  3129	0194			     .code
+1  3130					     ; incarcam	parametrii in stiva
+1  3131	118F  50			     push ax
+1  3132	1190  B8 0062r			     lea ax, rezultat
+1  3133	1193  50			     push ax
+1  3134	1194  A1 00B8r			     mov ax, word ptr numar + 2
+1  3135	1197  50			     push ax
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 56
+calc.asm
+
+
+
+1  3136	1198  A1 00B6r			     mov ax, word ptr numar
+1  3137	119B  50			     push ax
+1  3138
+1  3139	119C  D9 06 00B6r		     fld dword ptr [numar]
+1  3140	11A0  D9 E1			     fabs
+1  3141
+1  3142					     ; comparam	nr nostru in valoare absoluta cu maximul reprezentabil
+1  3143	11A2  D8 16 0186r		     fcom ??0053
+1  3144
+1  3145	11A6  9B DD 3E 018Er		     fstsw ??0055
+1  3146	11AB  9B			     fwait
+1  3147	11AC  A1 018Er			     mov     ax, ??0055
+1  3148	11AF  9E			     sahf
+1  3149	11B0  77 1C			     ja	??0058
+1  3150
+1  3151					     ; comparam	nr nostru in valoare absoluta cu minimul reprezentabil
+1  3152	11B2  D8 1E 018Ar		     fcomp ??0054
+1  3153
+1  3154	11B6  9B DD 3E 018Er		     fstsw ??0055
+1  3155	11BB  9B			     fwait
+1  3156	11BC  A1 018Er			     mov     ax, ??0055
+1  3157	11BF  9E			     sahf
+1  3158	11C0  72 0C			     jb	??0058
+1  3159
+1  3160	11C2			     ??0057:
+1  3161					     ; desc
+1  3162	11C2  D9 1E 0190r		     fstp ??0052
+1  3163					     ; afisam nr in format normal
+1  3164	11C6  9A 00000000se		     call far ptr ftoa_proc
+1  3165	11CB  EB 0A 90			     jmp ??0056
+1  3166	11CE			     ??0058:
+1  3167	11CE  D9 1E 0190r		     fstp ??0052
+1  3168					     ; afisam nr in format stiintific
+1  3169	11D2  9A 00000000se		     call far ptr ftoa_sc_proc
+1  3170	11D7			     ??0056:
+1  3171	11D7  83 C4 06			     add sp, 6
+1  3172	11DA  58			     pop ax
+   3173					     strdz rezultat
+1  3174	11DB			     .data
+1  3175	0194  00			     ??005C db 0
+1  3176	0195			     .code
+1  3177					     strchr rezultat, 'E', ??005C
+2  3178	11DB  BE 0062r			     lea si, rezultat
+2  3179	11DE  B4 45			     mov ah, 'E'
+2  3180	11E0  9A 00000000se		     call far ptr strchr_proc
+2  3181	11E5  A2 0194r			     mov [??005C], al
+1  3182	11E8  80 3E 0194r 01		     cmp byte ptr [??005C], 1
+1  3183	11ED  74 2F			     je	??0059
+1  3184
+1  3185	11EF  BF 0062r			     lea di, rezultat
+1  3186	11F2  9A 00000000se		     call far ptr strlen_proc
+1  3187					     ; Daca sirul are lungimea 0, terminam operatia
+1  3188	11F7  3D 0000			     cmp ax, 0
+1  3189	11FA  74 22			     je	??0059
+1  3190
+1  3191					     ; Punem la	sfarsitul sirului 0
+1  3192	11FC  BE 0062r			     lea si, rezultat
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 57
+calc.asm
+
+
+
+1  3193	11FF  03 F0			     add si, ax
+1  3194	1201  4E			     dec si
+1  3195	1202			     ??005A:
+1  3196	1202  80 3C 2E			     cmp byte ptr [si],	'.'
+1  3197	1205  75 06			     jne ??005B
+1  3198	1207  C6 04 00			     mov byte ptr [si],	0
+1  3199	120A  EB 12 90			     jmp ??0059
+1  3200	120D			     ??005B:
+1  3201	120D  80 3C 30			     cmp byte ptr [si],	'0'
+1  3202	1210  75 0C			     jne ??0059
+1  3203	1212  3D 0001			     cmp ax, 1
+1  3204	1215  74 07			     je	??0059
+1  3205	1217  C6 04 00			     mov byte ptr [si],	0
+1  3206	121A  4E			     dec si
+1  3207	121B  48			     dec ax
+1  3208	121C  EB E4			     jmp ??005A
+1  3209	121E			     ??0059:
+   3210	121E			     op_afisare:
+   3211					     strlen rezultat, len
+1  3212	121E  BF 0062r			 lea di, rezultat
+1  3213	1221  9A 00000000se		     call strlen_proc
+1  3214	1226  A3 0090r			     mov [len],	ax
+   3215
+   3216	1229  C6 06 0130r 00		     mov byte ptr [op],	0
+   3217	122E  C6 06 0135r 00		     mov byte ptr [clear], 0
+   3218	1233			     op_gata:
+   3219	1233  C3			     ret
+   3220				     end start
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 58
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??0000				  Near	 CALC_TEXT:0026
+??0001				  Near	 CALC_TEXT:0044
+??0002				  Near	 CALC_TEXT:0062
+??0003				  Near	 CALC_TEXT:0080
+??0004				  Near	 CALC_TEXT:009E
+??0005				  Near	 CALC_TEXT:00BC
+??0006				  Near	 CALC_TEXT:00DA
+??0007				  Near	 CALC_TEXT:00F8
+??0008				  Near	 CALC_TEXT:0116
+??0009				  Near	 CALC_TEXT:0134
+??000A				  Near	 CALC_TEXT:0152
+??000B				  Near	 CALC_TEXT:0170
+??000C				  Near	 CALC_TEXT:018E
+??000D				  Near	 CALC_TEXT:01AC
+??000E				  Near	 CALC_TEXT:01CA
+??000F				  Near	 CALC_TEXT:01E8
+??0010				  Near	 CALC_TEXT:0206
+??0011				  Near	 CALC_TEXT:0224
+??0012				  Near	 CALC_TEXT:0242
+??0013				  Near	 CALC_TEXT:0260
+??0014				  Near	 CALC_TEXT:027E
+??0015				  Near	 CALC_TEXT:029C
+??0016				  Near	 CALC_TEXT:02BA
+??0017				  Near	 CALC_TEXT:02D8
+??0018				  Near	 CALC_TEXT:02F6
+??0019				  Near	 CALC_TEXT:0314
+??001A				  Near	 CALC_TEXT:05B4
+??001B				  Near	 CALC_TEXT:05CD
+??001C				  Near	 CALC_TEXT:06DA
+??001D				  Near	 CALC_TEXT:06E4
+??001E				  Dword	 DGROUP:0146
+??001F				  Dword	 DGROUP:013C
+??0020				  Dword	 DGROUP:0140
+??0021				  Word	 DGROUP:0144
+??0022				  Near	 CALC_TEXT:0CFD
+??0023				  Near	 CALC_TEXT:0CE8
+??0024				  Near	 CALC_TEXT:0CF4
+??0025				  Dword	 DGROUP:0154
+??0026				  Dword	 DGROUP:014A
+??0027				  Dword	 DGROUP:014E
+??0028				  Word	 DGROUP:0152
+??0029				  Near	 CALC_TEXT:0D5F
+??002A				  Near	 CALC_TEXT:0D4A
+??002B				  Near	 CALC_TEXT:0D56
+??002C				  Near	 CALC_TEXT:0DA6
+??002D				  Near	 CALC_TEXT:0D8A
+??002E				  Near	 CALC_TEXT:0D95
+??002F				  Byte	 DGROUP:0158
+??0030				  Dword	 DGROUP:0163
+??0031				  Dword	 DGROUP:0159
+??0032				  Dword	 DGROUP:015D
+??0033				  Word	 DGROUP:0161
+??0034				  Near	 CALC_TEXT:0E1C
+??0035				  Near	 CALC_TEXT:0E07
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 59
+Symbol Table
+
+
+
+??0036				  Near	 CALC_TEXT:0E13
+??0037				  Near	 CALC_TEXT:0E63
+??0038				  Near	 CALC_TEXT:0E47
+??0039				  Near	 CALC_TEXT:0E52
+??003A				  Byte	 DGROUP:0167
+??003B				  Dword	 DGROUP:0172
+??003C				  Dword	 DGROUP:0168
+??003D				  Dword	 DGROUP:016C
+??003E				  Word	 DGROUP:0170
+??003F				  Near	 CALC_TEXT:0ED7
+??0040				  Near	 CALC_TEXT:0EC2
+??0041				  Near	 CALC_TEXT:0ECE
+??0042				  Near	 CALC_TEXT:0F1E
+??0043				  Near	 CALC_TEXT:0F02
+??0044				  Near	 CALC_TEXT:0F0D
+??0045				  Byte	 DGROUP:0176
+??0046				  Dword	 DGROUP:0181
+??0047				  Dword	 DGROUP:0177
+??0048				  Dword	 DGROUP:017B
+??0049				  Word	 DGROUP:017F
+??004A				  Near	 CALC_TEXT:0F98
+??004B				  Near	 CALC_TEXT:0F83
+??004C				  Near	 CALC_TEXT:0F8F
+??004D				  Near	 CALC_TEXT:0FDF
+??004E				  Near	 CALC_TEXT:0FC3
+??004F				  Near	 CALC_TEXT:0FCE
+??0050				  Byte	 DGROUP:0185
+??0051				  Near	 CALC_TEXT:1017
+??0052				  Dword	 DGROUP:0190
+??0053				  Dword	 DGROUP:0186
+??0054				  Dword	 DGROUP:018A
+??0055				  Word	 DGROUP:018E
+??0056				  Near	 CALC_TEXT:11D7
+??0057				  Near	 CALC_TEXT:11C2
+??0058				  Near	 CALC_TEXT:11CE
+??0059				  Near	 CALC_TEXT:121E
+??005A				  Near	 CALC_TEXT:1202
+??005B				  Near	 CALC_TEXT:120D
+??005C				  Byte	 DGROUP:0194
+??DATE				  Text	 "04/04/16"
+??FILENAME			  Text	 "calc	  "
+??TIME				  Text	 "21:24:55"
+??VERSION			  Number 040A
+@32BIT				  Text	 0
+@CODE				  Text	 CALC_TEXT
+@CODESIZE			  Text	 1
+@CPU				  Text	 0707H
+@CURSEG				  Text	 CALC_TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 1
+@FILENAME			  Text	 CALC
+@INTERFACE			  Text	 000H
+@MODEL				  Text	 5
+@STACK				  Text	 DGROUP
+@WORDSIZE			  Text	 2
+ARE_MINUS			  Byte	 DGROUP:00B1
+ARE_PUNCT			  Byte	 DGROUP:00B0
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 60
+Symbol Table
+
+
+
+ATOF_PROC			  Far	 ----:---- Extern
+ATOI_PROC			  Far	 ----:---- Extern
+BLACK				  Number 0000
+BLUE				  Number 0001
+BROWN				  Number 0006
+BR_BLUE				  Number 0009
+BR_CYAN				  Number 000B
+BR_GREEN			  Number 000A
+BR_MAGENTA			  Number 000D
+BR_RED				  Number 000C
+BR_WHITE			  Number 000F
+C2IS1				  Near	 CALC_TEXT:1127
+C3IS1				  Near	 CALC_TEXT:1155
+CALCUL				  Near	 CALC_TEXT:10B4
+CASE				  Byte	 DGROUP:0003
+CASEJMP				  Word	 DGROUP:0024
+CASES				  Word	 DGROUP:0022
+CINCI				  Byte	 DGROUP:00A2
+CLEAR				  Byte	 DGROUP:0135
+CONTINUA			  Near	 CALC_TEXT:0AAA
+CR				  Number 000D
+CYAN				  Number 0003
+DIN_NOU				  Near	 CALC_TEXT:0697
+DOI				  Byte	 DGROUP:009C
+EROARE_DIV0			  Byte	 DGROUP:00CC
+EROARE_DN			  Byte	 DGROUP:0119
+EROARE_DP			  Byte	 DGROUP:010A
+EROARE_GOL			  Byte	 DGROUP:0100
+EROARE_MINF			  Byte	 DGROUP:00F7
+EROARE_NAN			  Byte	 DGROUP:00DD
+EROARE_PINF			  Byte	 DGROUP:00EE
+EROARE_SQRT			  Byte	 DGROUP:00BA
+ET				  Near	 CALC_TEXT:10A6
+ET_0				  Near	 CALC_TEXT:070D
+ET_00C				  Near	 CALC_TEXT:0741
+ET_00_				  Near	 CALC_TEXT:074E
+ET_0C				  Near	 CALC_TEXT:071C
+ET_0_				  Near	 CALC_TEXT:0759
+ET_1				  Near	 CALC_TEXT:075C
+ET_11C				  Near	 CALC_TEXT:0790
+ET_11_				  Near	 CALC_TEXT:079D
+ET_1C				  Near	 CALC_TEXT:076B
+ET_1_				  Near	 CALC_TEXT:07A8
+ET_2				  Near	 CALC_TEXT:07AB
+ET_22C				  Near	 CALC_TEXT:07DF
+ET_22_				  Near	 CALC_TEXT:07EC
+ET_2C				  Near	 CALC_TEXT:07BA
+ET_2_				  Near	 CALC_TEXT:07F7
+ET_3				  Near	 CALC_TEXT:07FA
+ET_33C				  Near	 CALC_TEXT:082E
+ET_33_				  Near	 CALC_TEXT:083B
+ET_3C				  Near	 CALC_TEXT:0809
+ET_3_				  Near	 CALC_TEXT:0846
+ET_4				  Near	 CALC_TEXT:0849
+ET_44C				  Near	 CALC_TEXT:087D
+ET_44_				  Near	 CALC_TEXT:088A
+ET_4C				  Near	 CALC_TEXT:0858
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 61
+Symbol Table
+
+
+
+ET_4_				  Near	 CALC_TEXT:0895
+ET_5				  Near	 CALC_TEXT:0898
+ET_55C				  Near	 CALC_TEXT:08CC
+ET_55_				  Near	 CALC_TEXT:08D9
+ET_5C				  Near	 CALC_TEXT:08A7
+ET_5_				  Near	 CALC_TEXT:08E4
+ET_6				  Near	 CALC_TEXT:08E7
+ET_66C				  Near	 CALC_TEXT:091B
+ET_66_				  Near	 CALC_TEXT:0928
+ET_6C				  Near	 CALC_TEXT:08F6
+ET_6_				  Near	 CALC_TEXT:0933
+ET_7				  Near	 CALC_TEXT:0936
+ET_77C				  Near	 CALC_TEXT:096A
+ET_77_				  Near	 CALC_TEXT:0977
+ET_7C				  Near	 CALC_TEXT:0945
+ET_7_				  Near	 CALC_TEXT:0982
+ET_8				  Near	 CALC_TEXT:0985
+ET_88C				  Near	 CALC_TEXT:09B9
+ET_88_				  Near	 CALC_TEXT:09C6
+ET_8C				  Near	 CALC_TEXT:0994
+ET_8_				  Near	 CALC_TEXT:09D1
+ET_9				  Near	 CALC_TEXT:09D4
+ET_99C				  Near	 CALC_TEXT:0A08
+ET_99_				  Near	 CALC_TEXT:0A15
+ET_9C				  Near	 CALC_TEXT:09E3
+ET_9_				  Near	 CALC_TEXT:0A20
+ET_B				  Near	 CALC_TEXT:106E
+ET_B1				  Near	 CALC_TEXT:102C
+ET_B2				  Near	 CALC_TEXT:1041
+ET_B3				  Near	 CALC_TEXT:1056
+ET_B4				  Near	 CALC_TEXT:1063
+ET_BACKSPACE			  Near	 CALC_TEXT:1001
+ET_B_MARE			  Near	 CALC_TEXT:0F21
+ET_B_MIC			  Near	 CALC_TEXT:0F21
+ET_C_MARE			  Near	 CALC_TEXT:1071
+ET_C_MIC			  Near	 CALC_TEXT:1071
+ET_DEFAULT			  Near	 CALC_TEXT:070A
+ET_EGAL				  Near	 CALC_TEXT:0FE2
+ET_ENTER			  Near	 CALC_TEXT:0FE2
+ET_IMP				  Near	 CALC_TEXT:0C3E
+ET_IMP0				  Near	 CALC_TEXT:0C22
+ET_IMPARTIRE			  Near	 CALC_TEXT:0C13
+ET_INM				  Near	 CALC_TEXT:0BF4
+ET_INM0				  Near	 CALC_TEXT:0BD8
+ET_INMULTIRE			  Near	 CALC_TEXT:0BC9
+ET_I_MARE			  Near	 CALC_TEXT:0DA9
+ET_I_MIC			  Near	 CALC_TEXT:0DA9
+ET_M				  Near	 CALC_TEXT:0BAA
+ET_M0				  Near	 CALC_TEXT:0B8E
+ET_MINUS			  Near	 CALC_TEXT:0B7F
+ET_P				  Near	 CALC_TEXT:0B60
+ET_P0				  Near	 CALC_TEXT:0B44
+ET_PC				  Near	 CALC_TEXT:0A55
+ET_PLUS				  Near	 CALC_TEXT:0B35
+ET_PUNCT			  Near	 CALC_TEXT:0A23
+ET_P_				  Near	 CALC_TEXT:0A84
+ET_P_MARE			  Near	 CALC_TEXT:0D04
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 62
+Symbol Table
+
+
+
+ET_P_MIC			  Near	 CALC_TEXT:0D04
+ET_REZ				  Near	 CALC_TEXT:0FFE
+ET_RR_				  Near	 CALC_TEXT:0C8C
+ET_R_MARE			  Near	 CALC_TEXT:0C5D
+ET_R_MIC			  Near	 CALC_TEXT:0C5D
+ET_SB0_				  Near	 CALC_TEXT:0B32
+ET_SB_				  Near	 CALC_TEXT:0B0C
+ET_SPACEBAR			  Near	 CALC_TEXT:0A92
+ET_S_MARE			  Near	 CALC_TEXT:0E66
+ET_S_MIC			  Near	 CALC_TEXT:0E66
+E_MINUS_ZERO			  Word	 DGROUP:00B4
+FTOA_PROC			  Far	 ----:---- Extern
+FTOA_SC_PROC			  Far	 ----:---- Extern
+GATA				  Near	 CALC_TEXT:0706
+GETC_PROC			  Far	 ----:---- Extern
+GETS_PROC			  Far	 ----:---- Extern
+GRAY				  Number 0008
+GREEN				  Number 0002
+ISDENORMAL			  Near	 CALC_TEXT:116A
+ISEMPTY				  Near	 CALC_TEXT:115C
+ISINFINITY			  Near	 CALC_TEXT:1134
+ISNAN				  Near	 CALC_TEXT:1119
+ITOA_PROC			  Far	 ----:---- Extern
+KBD_0				  Number 0030
+KBD_1				  Number 0031
+KBD_2				  Number 0032
+KBD_3				  Number 0033
+KBD_4				  Number 0034
+KBD_5				  Number 0035
+KBD_6				  Number 0036
+KBD_7				  Number 0037
+KBD_8				  Number 0038
+KBD_9				  Number 0039
+KBD_BACKSPACE			  Number 0008
+KBD_B_MARE			  Number 0042
+KBD_B_MIC			  Number 0062
+KBD_C_MARE			  Number 0043
+KBD_C_MIC			  Number 0063
+KBD_EGAL			  Number 002D
+KBD_ENTER			  Number 000D
+KBD_ESC				  Number 001B
+KBD_IMPARTIRE			  Number 002F
+KBD_INMULTIRE			  Number 002A
+KBD_I_MARE			  Number 0049
+KBD_I_MIC			  Number 0069
+KBD_MINUS			  Number 002D
+KBD_PLUS			  Number 002B
+KBD_PUNCT			  Number 002E
+KBD_P_MARE			  Number 0050
+KBD_P_MIC			  Number 0070
+KBD_R_MARE			  Number 0052
+KBD_R_MIC			  Number 0072
+KBD_SPACEBAR			  Number 0020
+KBD_S_MARE			  Number 0053
+KBD_S_MIC			  Number 0073
+LEN				  Word	 DGROUP:0090
+LF				  Number 000A
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 63
+Symbol Table
+
+
+
+LTOA_PROC			  Far	 ----:---- Extern
+MAGENTA				  Number 0005
+MAX				  Number 0015
+MEMSET_PROC			  Far	 ----:---- Extern
+MINIM				  Dword	 DGROUP:0136
+MINUS				  Byte	 DGROUP:00AE
+MINUS_ZERO			  Byte	 DGROUP:0092
+NEGDENORMAL			  Near	 CALC_TEXT:117D
+NEGINFINITY			  Near	 CALC_TEXT:1147
+NEGNORMAL			  Near	 CALC_TEXT:1131
+NEWLINE				  Byte	 DGROUP:0000
+NOUA				  Byte	 DGROUP:00AA
+NR1				  Dword	 DGROUP:0128
+NR2				  Dword	 DGROUP:012C
+NUMAR				  Dword	 DGROUP:00B6
+OP				  Byte	 DGROUP:0130
+OPT				  Byte	 DGROUP:00A8
+OP_AFISARE			  Near	 CALC_TEXT:121E
+OP_FINAL			  Near	 CALC_TEXT:10FC
+OP_FINAL_			  Near	 CALC_TEXT:118B
+OP_GATA				  Near	 CALC_TEXT:1233
+OP_IMP				  Near	 CALC_TEXT:10F4
+OP_IMPARTIRE			  Near	 CALC_TEXT:10EA
+OP_INMULTIRE			  Near	 CALC_TEXT:10D8
+OP_MINUS			  Near	 CALC_TEXT:10C6
+PATRU				  Byte	 DGROUP:00A0
+PUNCT				  Byte	 DGROUP:00AC
+PUTC_PROC			  Far	 ----:---- Extern
+PUTI_PROC			  Far	 ----:---- Extern
+PUTS_PROC			  Far	 ----:---- Extern
+PUTU_PROC			  Far	 ----:---- Extern
+RED				  Number 0004
+REZULTAT			  Byte	 DGROUP:0062
+ROUND				  Dword	 DGROUP:0131
+SAPTE				  Byte	 DGROUP:00A6
+SASE				  Byte	 DGROUP:00A4
+START				  Near	 CALC_TEXT:0000
+STATUS				  Word	 DGROUP:013A
+STRCAT_PROC			  Far	 ----:---- Extern
+STRCHR_PROC			  Far	 ----:---- Extern
+STRCMP_PROC			  Far	 ----:---- Extern
+STRLEN_PROC			  Far	 ----:---- Extern
+TAB				  Number 0009
+TEMP				  Byte	 DGROUP:0078
+TREI				  Byte	 DGROUP:009E
+UNU				  Byte	 DGROUP:009A
+WHITE				  Number 0007
+X				  Word	 DGROUP:008E
+YELLOW				  Number 000E
+ZERO				  Byte	 DGROUP:0098
+ZERO_INITIAL			  Word	 DGROUP:00B2
+ZERO_PUNCT			  Byte	 DGROUP:0095
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 64
+Symbol Table
+
+
+
+
+Macro Name
+
+ATOI
+BIOS_CLS
+BIOS_DATA
+BIOS_HPUTC_COLOR
+BIOS_PUTC
+BIOS_PUTC_COLOR
+BIOS_PUTS
+BIOS_VPUTC_COLOR
+BIOS_WRITE
+CLS
+CLS_REGION
+END_VIDEO
+EXIT_DOS
+FIND_FIRST
+FIND_NEXT
+F_CLOSE
+F_READ
+F_WRITE
+GETC
+GETI
+GETS
+GETU
+GETVEC
+GOTOXY
+INIT_DS_ES
+INPUTS
+ITOA
+MEMSET
+O_CREAT
+O_READ
+O_WRITE
+PUTC
+PUTI
+PUTS
+PUTSI
+PUTU
+SETVEC
+SET_DTA
+START_VIDEO
+STRCAT
+STRCHR
+STRCMP
+STRDLC
+STRDZ
+STRLEN
+STRPCAT
+TEXTMODE80X25
+_ATOF
+_FTOA
+Turbo Assembler	 Version 4.1	    04/04/16 21:24:55	    Page 65
+Symbol Table
+
+
+
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+CALC_TEXT			  16  1234 Word	  Public  CODE
+DGROUP				  Group
+  STACK				  16  0100 Para	  Stack	  STACK
+  _DATA				  16  0195 Word	  Public  DATA
+

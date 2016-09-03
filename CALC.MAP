@@ -1,0 +1,11 @@
+
+ Start  Stop   Length Name               Class
+
+ 00000H 01233H 01234H CALC_TEXT          CODE
+ 01234H 017A8H 00575H IO_TEXT            CODE
+ 017AAH 017F1H 00048H STRING_TEXT        CODE
+ 01800H 01A27H 00228H _DATA              DATA
+ 01A30H 01B2FH 00100H STACK              STACK
+
+Program entry point at 0000:0000
+
